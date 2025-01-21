@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { postdata } from "@/app/data/postdata";
+import { postdata } from "@/app/(main)/data/postdata";
 import Link from "next/link";
 
 // Function to extract the first image's src from the post_content

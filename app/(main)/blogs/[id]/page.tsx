@@ -1,5 +1,5 @@
 "use client";
-import { postdata } from "@/app/data/postdata";
+import { postdata } from "@/app/(main)/data/postdata";
 import { useParams } from "next/navigation";
 
 const BlogCategory = () => {

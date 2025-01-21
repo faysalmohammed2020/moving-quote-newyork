@@ -1,4 +1,4 @@
-import { testimonials } from "@/app/data/testimonialsData";
+import { testimonials } from "@/app/(main)/data/testimonialsData";
 import Image from "next/image";
 import Link from "next/link";
 

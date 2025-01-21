@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChevronDown, Menu, X } from "lucide-react";
 import Image from "next/image";
 //import { serviceBlogTitle } from "@/app/data/blogData";
-import { postdata } from "@/app/data/postdata";
+import { postdata } from "@/app/(main)/data/postdata";
 
 
 

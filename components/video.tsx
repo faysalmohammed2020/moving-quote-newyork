@@ -1,4 +1,4 @@
-import { videos } from "@/app/data/videoData";
+import { videos } from "@/app/(main)/data/videoData";
 import Link from "next/link";
 
 const VideoSection = () => {

@@ -1,5 +1,5 @@
 "use client";
-import { postdata } from "@/app/data/postdata";
+import { postdata } from "@/app/(main)/data/postdata";
 import React, { useState } from "react";
 import Link from "next/link";
 import { Editor } from "@tinymce/tinymce-react";

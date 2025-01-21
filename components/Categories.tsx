@@ -5,8 +5,8 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "@/components/ui/accordion";
-import { placeData } from "@/app/data/placeData";
-import { postdata } from "@/app/data/postdata"; 
+import { placeData } from "@/app/(main)/data/placeData";
+import { postdata } from "@/app/(main)/data/postdata";
 import Link from "next/link";
 
 const Categories = () => {

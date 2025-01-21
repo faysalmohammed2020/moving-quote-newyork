@@ -1,6 +1,6 @@
 'use client';
 import React, { useState } from "react";
-import { postdata } from "../data/postdata";
+import { postdata } from "@/app/(main)/data/postdata";
 import { FaBlog, FaFileAlt, FaComments, FaHeart } from "react-icons/fa"; // Importing icons
 import BlogPostForm from "@/components/blogForm";
 

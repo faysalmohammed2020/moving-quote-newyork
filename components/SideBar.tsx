@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { sidebarItems, SidebarItem } from "@/app/data/SideBarData";
+import { sidebarItems, SidebarItem } from "@/app/(main)/data/SideBarData";
 import { LuArrowLeftFromLine, LuArrowRightToLine } from "react-icons/lu";
 
 const Sidebar: React.FC = () => {
