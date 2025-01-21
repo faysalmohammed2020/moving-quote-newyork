@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* scrollbar */
+.scrollbar {
+    @apply max-h-[350px] max-w-full overflow-auto pr-4; /* Enables both vertical and horizontal scrolling */
+  }
+  
+  .scrollbar::-webkit-scrollbar {
+    @apply w-2 h-2; /* Sets both width (for vertical) and height (for horizontal) of the scrollbar */
+  }
+  
+  .scrollbar::-webkit-scrollbar-track {
+    @apply bg-gray-500; /* Track color for both scrollbars */
+  }
+  
+  .scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-gray-700; /* Thumb color for both scrollbars */
+  }
+  
+  .scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-yellow-400; /* Thumb color on hover for both scrollbars */
+  }
