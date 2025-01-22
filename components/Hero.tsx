@@ -21,7 +21,7 @@ const HeroSection = () => {
         </div>
       </div>
 
-      <div className=" fixed top-28 right-10 z-50">
+      <div className=" fixed top-28 right-10 ">
         <MovingCalculator/>
       </div>
       {/* <div className="fixed top-[15%]">
