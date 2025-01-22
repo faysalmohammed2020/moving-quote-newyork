@@ -1,5 +1,5 @@
 "use client";
-import { videos } from "@/app/data/videoData";
+import { videos } from "@/app/(main)/data/videoData";
 
 const VideoAll = () => {
    
