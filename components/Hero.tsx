@@ -1,10 +1,37 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import MovingCalculator from "./QuoteForm";
 // import ScrollForm from "./ScrollingForm";
 
 
 const HeroSection = () => {
+  const [isScrolling, setIsScrolling] = useState(false);
+
+  useEffect(() => {
+    let scrollTimeout: NodeJS.Timeout;
+
+    const handleScroll = () => {
+      setIsScrolling(true);
+
+      // Clear timeout if user keeps scrolling
+      clearTimeout(scrollTimeout);
+
+      // Set timeout to reset the state after scrolling stops
+      scrollTimeout = setTimeout(() => {
+        setIsScrolling(false);
+      }, 500); // Adjust timeout duration as needed
+    };
+
+    window.addEventListener("scroll", handleScroll);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      clearTimeout(scrollTimeout);
+    };
+  }, []);
+
+
   
 
   return (
@@ -21,9 +48,14 @@ const HeroSection = () => {
         </div>
       </div>
 
-      <div className=" fixed top-28 right-10 ">
-        <MovingCalculator/>
-      </div>
+     <div
+          className={`fixed top-[15%] right-[2.52%] z-30 w-[650px] h-[600px] transform transition-all duration-300 ${
+            isScrolling ? "scale-[0.4]" : "scale-[1]"
+          }`}
+          style={{ transformOrigin: "top right" }} // Adjust origin for zoom effect
+        >
+          <MovingCalculator />
+        </div>
       {/* <div className="fixed top-[15%]">
       <ScrollForm/>
      </div> */}
