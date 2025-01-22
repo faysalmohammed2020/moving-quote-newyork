@@ -31,8 +31,8 @@ const TestimonialsAll = () => {
                 className="w-16 h-16 rounded-full object-cover mr-4"
               />
               <div>
-                <p className="text-black italic mb-4">"{testimonial.feedback}"</p>
-                <p className="text-gray-900 font-bold text-lg">- {testimonial.name}</p>
+                <p className="text-black italic mb-4">{testimonial.feedback}</p>
+                <p className="text-gray-900 font-bold text-lg"> - {testimonial.name}</p>
                 <p className="text-yellow-400 text-lg">
                   {renderStars(testimonial.rating)} {/* Display stars */}
                 </p>

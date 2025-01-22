@@ -1,7 +1,7 @@
 "use client";
 
 import MovingCalculator from "./QuoteForm";
-import ScrollForm from "./ScrollingForm";
+// import ScrollForm from "./ScrollingForm";
 
 
 const HeroSection = () => {
@@ -21,12 +21,12 @@ const HeroSection = () => {
         </div>
       </div>
 
-      <div className="mt-[5%] mr-[5%]">
+      <div className=" fixed top-28 right-10 z-50">
         <MovingCalculator/>
       </div>
-      <div className="fixed top-[15%]">
+      {/* <div className="fixed top-[15%]">
       <ScrollForm/>
-     </div>
+     </div> */}
       </div>
       
       
