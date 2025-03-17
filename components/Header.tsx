@@ -6,10 +6,12 @@ import { ChevronDown, Menu, X } from "lucide-react";
 import Image from "next/image";
 //import { serviceBlogTitle } from "@/app/data/blogData";
 import { postdata } from "@/app/(main)/data/postdata";
+import { signOut, useSession } from "@/lib/auth-client";
 
 const HeaderMenu: React.FC = () => {
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const { data: session } = useSession();
 
   const filteredBlogs = postdata.filter((blog) =>
     blog.post_title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -194,12 +196,20 @@ const HeaderMenu: React.FC = () => {
           
         </ul>
         {/* Sign In Button */}
-        <Link
-              href="/AdminLogin"
-              className=" bg-orange-500 text-white px-6 py-2 rounded-full hover:bg-orange-600 transition-all duration-300"
-            >
-              Admin Login 
-            </Link>
+        {
+            session ? (
+              <button 
+                onClick={() => signOut()} 
+                className="bg-red-500 text-white px-6 py-2 rounded-full hover:bg-red-600 transition-all duration-300"
+              >
+                Logout
+              </button>
+            ) : (
+              <Link href="/sign-in" className="bg-orange-500 text-white px-6 py-2 rounded-full hover:bg-orange-600 transition-all duration-300">
+                 Login
+              </Link>
+            
+          )}
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
