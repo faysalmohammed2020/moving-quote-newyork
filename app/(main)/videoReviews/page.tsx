@@ -11,7 +11,7 @@ const VideoAll = () => {
             All Videos  
           </h2>
           <p className="text-gray-300 mb-10">
-            Explore how our innovative logistics solutions meet your business needs.
+          Watch our expert-led video lessons to master the UK PCO Licence Exam. Gain in-depth knowledge, practical tips, and step-by-step guidance to help you succeed!
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {videos.map((video, index) => (
