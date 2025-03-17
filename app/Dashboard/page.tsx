@@ -1,20 +1,22 @@
-'use client';
+"use client";
 import React, { useState } from "react";
 import { postdata } from "@/app/(main)/data/postdata";
-import { FaBlog, FaFileAlt, FaComments, FaHeart } from "react-icons/fa"; // Importing icons
+import { FaBlog, FaFileAlt, FaComments, FaHeart } from "react-icons/fa";
 import BlogPostForm from "@/components/blogForm";
+import { signOut, useSession } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
 
 const Dashboard = () => {
-  const [isFormVisible, setFormVisible] = useState(false); // State to toggle the form visibility
-  const [selectedBlog, setSelectedBlog] = useState(null); // State for the blog being edited
+  const [isFormVisible, setFormVisible] = useState(false);
+  const [selectedBlog, setSelectedBlog] = useState(null);
+  const { data: session } = useSession();
+  const router = useRouter();
 
-  // Function to open the form modal
   const openForm = (blog = null) => {
     setSelectedBlog(blog);
     setFormVisible(true);
   };
 
-  // Function to close the form modal
   const closeForm = () => {
     setFormVisible(false);
     setSelectedBlog(null);
@@ -23,16 +25,22 @@ const Dashboard = () => {
   return (
     <>
       <div className="bg-gray-50 p-8">
-        {/* Header */}
         <header className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-2xl font-semibold">Welcome Admin! 👋</h1>
             <p className="text-gray-500">Good evening!</p>
           </div>
           <div className="text-gray-500">Today: December 28, 2024</div>
+          {session && (
+             <button
+             onClick={() => signOut().then(() => router.push("/sign-in"))}
+             className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"
+           >
+             Logout
+           </button>
+          )}
         </header>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           <StatCard
             title="Total Blogs"
@@ -56,20 +64,15 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Main Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Visitors Chart */}
           <div>
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-medium mb-4">Visitors</h3>
               <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center">
-                {/* Replace this placeholder with a chart */}
                 <span>Chart Placeholder</span>
               </div>
             </div>
           </div>
-
-          {/* Recent Blogs */}
           <div>
             <div className="bg-white p-6 rounded-lg shadow">
               <div className="flex justify-between items-center mb-4">
@@ -81,15 +84,14 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Modal for adding new or editing a blog post */}
       {isFormVisible && (
         <div
           className="fixed inset-0 bg-gray-500 bg-opacity-50 flex items-center justify-center z-50"
-          onClick={closeForm} // Close form when clicking outside
+          onClick={closeForm}
         >
           <div
             className="bg-white p-6 rounded-lg shadow-md w-1/3"
-            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the modal
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium">{selectedBlog ? "Edit Blog" : "Create a New Blog"}</h3>
@@ -108,12 +110,7 @@ const Dashboard = () => {
   );
 };
 
-// Stat Card Component
-const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode }> = ({
-  title,
-  value,
-  icon,
-}) => (
+const StatCard = ({ title, value, icon }) => (
   <div className="bg-white p-4 rounded-lg shadow flex items-center">
     <div className="p-3 bg-gray-100 rounded-lg mr-4">{icon}</div>
     <div>
@@ -123,10 +120,8 @@ const StatCard: React.FC<{ title: string; value: string | number; icon: React.Re
   </div>
 );
 
-// Blog List Component
-const BlogList: React.FC<{ openForm: (blog: any) => void }> = ({ openForm }) => {
+const BlogList = ({ openForm }) => {
   const blogs = postdata.slice(0, 8);
-
   return (
     <ul className="scrollbar max-h-[250px] divide-y divide-gray-200 overflow-y-auto">
       {blogs.map((blog, index) => (

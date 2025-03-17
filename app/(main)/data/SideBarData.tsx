@@ -32,43 +32,31 @@ export const sidebarItems: SidebarItem[] = [
 
   // Comments Moderation
   {
-    href: "/dashboard/comments",
+    href: "/Dashboard/comments",
     label: "Comments Moderation",
     icon: <HiOutlineUserGroup className="size-6" />,
   },
 
   // Analytics
   {
-    href: "/dashboard/analytics",
+    href: "/Dashboard/analytics",
     label: "Analytics",
     icon: <AiOutlineBarChart className="size-6" />,
   },
 
   // Media Library
   {
-    href: "/dashboard/media-library",
+    href: "/Dashboard/media-library",
     label: "Media Library",
     icon: <FiImage className="size-6" />,
   },
 
   // User Management
   {
-    href: "/dashboard/user-management",
+    href: "/Dashboard/user-management",
     label: "User Management",
     icon: <HiOutlineUserGroup className="size-6" />,
   },
 
-  // SEO Settings
-  {
-    href: "/dashboard/seo-settings",
-    label: "SEO Settings",
-    icon: <AiOutlineSetting className="size-6" />,
-  },
-
-  // Site Settings
-  {
-    href: "/dashboard/site-settings",
-    label: "Site Settings",
-    icon: <MdOutlineSettings className="size-6" />,
-  },
+  
 ];
