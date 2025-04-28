@@ -63,3 +63,34 @@ model verifications {
   createdAt  DateTime?
   updatedAt  DateTime?
 }
+
+model lead {
+  id              Int      @id @default(autoincrement())
+  key             String
+  leadType        String   @map("lead_type")
+  leadSource      String   @map("lead_source")
+  referer         String
+  fromIp          String   @map("from_ip")
+  firstName       String   @map("first_name")
+  lastName        String   @map("last_name")
+  email           String
+  phone           String
+  phoneExt        String?  @map("phone_ext")
+  fromState       String   @map("from_state")
+  fromStateCode   String   @map("from_state_code")
+  fromCity        String   @map("from_city")
+  fromZip         String   @map("from_zip")
+  toState         String   @map("to_state")
+  toStateCode     String   @map("to_state_code")
+  toCity          String   @map("to_city")
+  toZip           String   @map("to_zip")
+  moveDate        DateTime? @map("move_date")
+  moveSize        String   @map("move_size")
+  selfPackaging   Boolean?  @map("self_packaging")
+  hasCar          Boolean?  @map("has_car")
+  carMake         String?  @map("car_make")
+  carModel        String?  @map("car_model")
+  carMakeYear     String?  @map("car_make_year")
+  submittedAt     DateTime  @default(now()) @map("submitted_at") 
+}
+

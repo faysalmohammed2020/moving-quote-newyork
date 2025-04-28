@@ -9,7 +9,7 @@ const MovingCalculator: React.FC = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [referer, setReferer] = useState("");
+  const [referer, setReferer] = useState("Direct"); // default to Direct
   const [leadType, setLeadType] = useState("");
   const [fromZip, setFromZip] = useState("");
   const [fromCity, setFromCity] = useState("");
@@ -32,79 +32,115 @@ const MovingCalculator: React.FC = () => {
     "Office move",
   ];
 
-  const leadTypes = ["Residential", "Commercial", "International", "Other"];
-  const usStates = ["California", "Texas", "Florida", "New York", "Illinois"];
-  const zipCodes = ["10001", "90001", "60601", "75201", "30301", "94101"];
-  const cities = ["Los Angeles", "New York", "Chicago", "Dallas", "Atlanta", "San Francisco"];
+  const usStates = ["Alaska"];
+  const zipCodes = ["99501", "99502", "99503", "99504", "99505", "99506"];
+  const cities = ["Anchorage", "Fairbanks", "Juneau", "Sitka", "Ketchikan", "Wasilla"];
 
   useEffect(() => {
     fetch("https://api.ipify.org?format=json")
       .then((res) => res.json())
       .then((data) => setFromIp(data.ip))
       .catch((err) => console.error("IP fetch error:", err));
+    if (document.referrer) {
+      setReferer(document.referrer);
+    }
   }, []);
 
-  const handleCalculate = () => {
+  useEffect(() => {
+    if (fromState && toState) {
+      if (fromState === toState) {
+        setLeadType("Local");
+      } else {
+        setLeadType("International");
+      }
+    }
+  }, [fromState, toState]);
+
+  const handleCalculate = async () => {
     const newErrors: Record<string, string> = {};
+    // Form validation
     if (!name) newErrors.name = "Name is required.";
     if (!email) newErrors.email = "Email is required.";
     else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = "Invalid email format.";
     if (!phone) newErrors.phone = "Phone is required.";
-    if (!referer) newErrors.referer = "Referer is required.";
     if (!leadType) newErrors.leadType = "Lead type is required.";
     if (!acceptedTerms) newErrors.terms = "You must accept the Terms.";
-
+  
     setErrors(newErrors);
+  
+    if (Object.keys(newErrors).length > 0) {
+      // If there are validation errors, don't proceed with the API request
+      return;
+    }
+  
+    const [firstName, ...lastNameParts] = name.split(" ");
+    const lastName = lastNameParts.join(" ");
+  
+    const jsonPayload = {
+      key: "c5QlLF3Ql90DGQr222tIqHd441",  // API key (consider securing it)
+      lead_type: leadType,
+      lead_source: referer ? "Website: " + referer : "Website: Direct",
+      referer: referer || "Direct",
+      from_ip: fromIp,
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      phone: phone.replace(/[^0-9]/g, ""),  // sanitize phone number
+      from_state: capitalizeWords(fromState),
+      from_state_code: fromState.slice(0, 2).toUpperCase(),
+      from_city: capitalizeWords(fromCity),
+      from_zip: fromZip,
+      to_state: capitalizeWords(toState),
+      to_state_code: toState.slice(0, 2).toUpperCase(),
+      to_city: capitalizeWords(toCity),
+      to_zip: toZip,
+      move_date: movingDate?.toISOString().split("T")[0] || "",
+      move_size: movingType,  // Assuming self-packaging is false by default
+      car_make: "",
+    car_model: "",
+    car_make_year: "",
+    };
 
-    if (Object.keys(newErrors).length === 0) {
-      const [firstName, ...lastNameParts] = name.split(" ");
-      const lastName = lastNameParts.join(" ");
-
-      const jsonPayload = {
-        key: "c5QlLF3Ql90DGQr222tIqHd441",
-        lead_type: leadType,
-        lead_source: "Facebook: " + referer,
-        referer: "Facebook: " + referer,
-        from_ip: fromIp,
-        first_name: firstName,
-        last_name: lastName,
-        email,
-        phone: phone.replace(/[^0-9]/g, ""),
-        phone_ext: "",
-        from_state: capitalizeWords(fromState),
-        from_state_code: fromState.slice(0, 2).toUpperCase(),
-        from_city: capitalizeWords(fromCity),
-        from_zip: fromZip,
-        to_state: capitalizeWords(toState),
-        to_state_code: toState.slice(0, 2).toUpperCase(),
-        to_city: capitalizeWords(toCity),
-        to_zip: toZip,
-        move_date: movingDate?.toISOString().split("T")[0] || "",
-        move_size: movingType,
-        self_packaging: 0,
-        has_car: 0,
-        car_make: "",
-        car_model: "",
-        car_make_year: "",
-      };
-
-      fetch("/api/save-form", {
+   
+  
+    try {
+      const response = await fetch("/api/save-form", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(jsonPayload),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          alert("Form submitted and saved!");
-          console.log("Response:", data);
-        })
-        .catch((err) => {
-          alert("Submission failed");
-          console.error("Error:", err);
-        });
-      
+      });
+  
+      if (!response.ok) {
+        throw new Error("Failed to save form data.");
+      }
+  
+      const data = await response.json();
+      console.log("Data from response", data);
+      if (data.message === "Form submitted successfully") {
+        alert("Form submitted and saved successfully!");
+        // Optionally reset form or perform other actions
+        setName("");
+        setEmail("");
+        setPhone("");
+        setFromZip("");
+        setFromCity("");
+        setFromState("");
+        setToZip("");
+        setToCity("");
+        setToState("");
+        setMovingType("");
+        setMovingDate(null);
+        setAcceptedTerms(false);
+      } else {
+        alert("An error occurred while submitting the form.");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      alert("There was an issue submitting the form. Please try again later.");
     }
   };
+  
+
 
   const capitalizeWords = (str: string) =>
     str.replace(/\b\w/g, (char) => char.toUpperCase());
@@ -116,12 +152,8 @@ const MovingCalculator: React.FC = () => {
         <input type="text" placeholder="Full Name" className="p-2 border rounded" value={name} onChange={(e) => setName(e.target.value)} />
         <input type="email" placeholder="Email" className="p-2 border rounded" value={email} onChange={(e) => setEmail(e.target.value)} />
         <input type="text" placeholder="Phone" className="p-2 border rounded" value={phone} onChange={(e) => setPhone(e.target.value)} />
-        <input type="text" placeholder="Referer (Page Name)" className="p-2 border rounded" value={referer} onChange={(e) => setReferer(e.target.value)} />
 
-        <select className="p-2 border rounded" value={leadType} onChange={(e) => setLeadType(e.target.value)}>
-          <option value="">Select Lead Type</option>
-          {leadTypes.map((type, i) => <option key={i} value={type}>{type}</option>)}
-        </select>
+        {/* NO referer input field anymore */}
 
         <select className="p-2 border rounded" value={fromZip} onChange={(e) => setFromZip(e.target.value)}>
           <option value="">From Zip</option>
