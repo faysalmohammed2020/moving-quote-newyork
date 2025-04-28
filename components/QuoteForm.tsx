@@ -59,6 +59,7 @@ const MovingCalculator: React.FC = () => {
   const handleCalculate = async () => {
     const bangladeshTime = new Date(new Date().getTime() + (6 * 60 * 60 * 1000));
     const newErrors: Record<string, string> = {};
+  
     // Form validation
     if (!name) newErrors.name = "Name is required.";
     if (!email) newErrors.email = "Email is required.";
@@ -98,15 +99,14 @@ const MovingCalculator: React.FC = () => {
       move_date: movingDate?.toISOString().split("T")[0] || "",
       move_size: movingType,  // Assuming self-packaging is false by default
       car_make: "",
-    car_model: "",
-    car_make_year: "",
-    submittedAt: bangladeshTime,
+      car_model: "",
+      car_make_year: "",
+      submittedAt: bangladeshTime,
     };
-
-   
   
     try {
-      const response = await fetch("/api/save-form", {
+      // Send data to the local API for saving
+    const response = await fetch("/api/save-form", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(jsonPayload),
@@ -118,7 +118,11 @@ const MovingCalculator: React.FC = () => {
   
       const data = await response.json();
       console.log("Data from response", data);
+  
       if (data.message === "Form submitted successfully") {
+        // Now send the data to the external API
+        await sendToExternalAPI(jsonPayload);
+  
         alert("Form submitted and saved successfully!");
         // Optionally reset form or perform other actions
         setName("");
@@ -141,6 +145,31 @@ const MovingCalculator: React.FC = () => {
       alert("There was an issue submitting the form. Please try again later.");
     }
   };
+  
+  const sendToExternalAPI = async (jsonPayload: any) => {
+    const sendingPoint = '/api/moving/receive-leads/receive.php/';
+  
+    // Prepare the request headers
+    const headers = new Headers({
+      'Authorization': 'Token token=buzzmoving2017',
+      'Content-Type': 'application/json',
+    });
+  
+    try {
+      const response = await fetch(sendingPoint, {
+        credentials: "include",
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify(jsonPayload),
+        
+      });
+      const result = await response.json();
+      console.log('Response from external API:', result);
+    } catch (error) {
+      console.error('Error sending data to external API:', error);
+    }
+  };
+  
   
 
 
