@@ -57,6 +57,7 @@ const MovingCalculator: React.FC = () => {
   }, [fromState, toState]);
 
   const handleCalculate = async () => {
+    const bangladeshTime = new Date(new Date().getTime() + (6 * 60 * 60 * 1000));
     const newErrors: Record<string, string> = {};
     // Form validation
     if (!name) newErrors.name = "Name is required.";
@@ -99,6 +100,7 @@ const MovingCalculator: React.FC = () => {
       car_make: "",
     car_model: "",
     car_make_year: "",
+    submittedAt: bangladeshTime,
     };
 
    

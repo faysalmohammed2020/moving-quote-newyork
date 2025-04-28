@@ -19,6 +19,12 @@ export async function POST(req: Request) {
       }
     }
 
+    // ✅ Calculate Bangladesh Time (+6 hours)
+    const getBangladeshTime = () => {
+      const now = new Date();
+      return new Date(now.getTime() + (6 * 60 * 60 * 1000)); // +6 hours
+    };
+
     const formSubmission = await prisma.lead.create({
       data: {
         key: data.key ?? "",
@@ -45,7 +51,7 @@ export async function POST(req: Request) {
         carMake: data.car_make || null,
         carModel: data.car_model || null,
         carMakeYear: data.car_make_year || null,
-        submittedAt: new Date(),   // <-- ADD THIS LINE to save current time
+        submittedAt: data.submittedAt ? new Date(data.submittedAt) : getBangladeshTime(),  // ✅ BD time!
       },
     });
 
