@@ -1,4 +1,4 @@
-// same imports...
+
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -57,7 +57,7 @@ const MovingCalculator: React.FC = () => {
   }, [fromState, toState]);
 
   const handleCalculate = async () => {
-    const bangladeshTime = new Date(new Date().getTime() + (6 * 60 * 60 * 1000));
+    // const bangladeshTime = new Date(new Date().getTime() + (6 * 60 * 60 * 1000));
     const newErrors: Record<string, string> = {};
   
     // Form validation
@@ -101,7 +101,7 @@ const MovingCalculator: React.FC = () => {
       car_make: "",
       car_model: "",
       car_make_year: "",
-      submittedAt: bangladeshTime,
+      // submittedAt: bangladeshTime,
     };
   
     try {
@@ -149,7 +149,6 @@ const MovingCalculator: React.FC = () => {
   const sendToExternalAPI = async (jsonPayload: any) => {
     const sendingPoint = '/api/moving/receive-leads/receive.php/';
   
-    // Prepare the request headers
     const headers = new Headers({
       'Authorization': 'Token token=buzzmoving2017',
       'Content-Type': 'application/json',
@@ -161,14 +160,31 @@ const MovingCalculator: React.FC = () => {
         method: "POST",
         headers: headers,
         body: JSON.stringify(jsonPayload),
-        
       });
-      const result = await response.json();
+  
+      const contentType = response.headers.get("content-type");
+  
+      let result;
+      if (contentType && contentType.includes("application/json")) {
+        result = await response.json();
+      } else {
+        result = JSON.parse(await response.text());
+      }
+  
       console.log('Response from external API:', result);
+  
+      // Save the API response to your DB
+      await fetch("/api/save-response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(result),
+      });
+  
     } catch (error) {
       console.error('Error sending data to external API:', error);
     }
   };
+  
   
   
 

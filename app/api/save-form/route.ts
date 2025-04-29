@@ -51,7 +51,7 @@ export async function POST(req: Request) {
         carMake: data.car_make || null,
         carModel: data.car_model || null,
         carMakeYear: data.car_make_year || null,
-        submittedAt: data.submittedAt ? new Date(data.submittedAt) : getBangladeshTime(),  // ✅ BD time!
+        createdAt: getBangladeshTime()  // ✅ BD time!
       },
     });
 
