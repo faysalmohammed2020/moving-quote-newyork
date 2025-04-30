@@ -70,7 +70,7 @@ const Dashboard = () => {
             icon={<FaBlog className="text-blue-500 text-2xl" />}
           />
           <StatCard
-            title="Total Leads"
+            title="Total Submission"
             value={totalLeads}
             icon={<FaFileAlt className="text-green-500 text-2xl" />}
           />
