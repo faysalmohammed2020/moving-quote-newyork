@@ -9,11 +9,11 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <>
-      <div className='flex'>
+      <div className='flex '>
       <div className='w-auto flex-shrink-0'>
       <Sidebar/>
       </div>
-      <main className="">
+      <main className="w-full"> 
         {children}
       </main>
       </div>
