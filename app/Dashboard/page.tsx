@@ -1,16 +1,38 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { postdata } from "@/app/(main)/data/postdata";
 import { FaBlog, FaFileAlt, FaComments, FaHeart } from "react-icons/fa";
 import BlogPostForm from "@/components/blogForm";
 import { signOut, useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
 
 const Dashboard = () => {
   const [isFormVisible, setFormVisible] = useState(false);
   const [selectedBlog, setSelectedBlog] = useState(null);
   const { data: session } = useSession();
   const router = useRouter();
+
+  const [stats, setStats] = useState({ dailyLeads: [], dailyResponses: [] });
+  const [totalLeads, setTotalLeads] = useState(0);
+  const [totalResponses, setTotalResponses] = useState(0);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await fetch("/api/admin/leads/stats");
+        const data = await res.json();
+        console.log("📈 Admin Dashboard Stats:", data);
+        setStats({ dailyLeads: data.dailyLeads, dailyResponses: data.dailyResponses });
+        setTotalLeads(data.totalLeads);
+        setTotalResponses(data.totalResponses);
+      } catch (error) {
+        console.error("Failed to fetch stats", error);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const openForm = (blog = null) => {
     setSelectedBlog(blog);
@@ -30,14 +52,14 @@ const Dashboard = () => {
             <h1 className="text-2xl font-semibold">Welcome Admin! 👋</h1>
             <p className="text-gray-500">Good evening!</p>
           </div>
-          <div className="text-gray-500">Today: December 28, 2024</div>
+          <div className="text-gray-500">Today: {new Date().toLocaleDateString()}</div>
           {session && (
-             <button
-             onClick={() => signOut().then(() => router.push("/sign-in"))}
-             className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"
-           >
-             Logout
-           </button>
+            <button
+              onClick={() => signOut().then(() => router.push("/sign-in"))}
+              className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"
+            >
+              Logout
+            </button>
           )}
         </header>
 
@@ -48,13 +70,13 @@ const Dashboard = () => {
             icon={<FaBlog className="text-blue-500 text-2xl" />}
           />
           <StatCard
-            title="Total Pages"
-            value="56"
+            title="Total Leads"
+            value={totalLeads}
             icon={<FaFileAlt className="text-green-500 text-2xl" />}
           />
           <StatCard
-            title="Comments"
-            value="34,267"
+            title="Total Responses"
+            value={totalResponses}
             icon={<FaComments className="text-yellow-500 text-2xl" />}
           />
           <StatCard
@@ -67,19 +89,41 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div>
             <div className="bg-white p-6 rounded-lg shadow">
-              <h3 className="text-lg font-medium mb-4">Visitors</h3>
-              <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center">
-                <span>Chart Placeholder</span>
-              </div>
+              <h3 className="text-lg font-medium mb-4">Daily Submissions</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={stats.dailyLeads}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#4f46e5" name="Leads" />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
+
           <div>
             <div className="bg-white p-6 rounded-lg shadow">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium">Recent Blogs</h3>
-              </div>
-              <BlogList openForm={openForm} />
+              <h3 className="text-lg font-medium mb-4">Daily Responses</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={stats.dailyResponses}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#22c55e" name="Responses" />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
+          </div>
+        </div>
+
+        <div className="mt-8">
+          <div className="bg-white p-6 rounded-lg shadow">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Recent Blogs</h3>
+            </div>
+            <BlogList openForm={openForm} />
           </div>
         </div>
       </div>
