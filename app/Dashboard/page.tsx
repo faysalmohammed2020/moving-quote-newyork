@@ -33,7 +33,10 @@ const Dashboard = () => {
       try {
         const res = await fetch("/api/admin/leads/stats");
         const data = await res.json();
-        setStats({ dailyLeads: data.dailyLeads, dailyResponses: data.dailyResponses });
+        setStats({
+          dailyLeads: data.dailyLeads,
+          dailyResponses: data.dailyResponses,
+        });
         setTotalLeads(data.totalLeads);
         setTotalResponses(data.totalResponses);
       } catch (error) {
@@ -72,12 +75,17 @@ const Dashboard = () => {
     <div className="bg-gray-50 p-8 min-h-screen w-full">
       <header className="flex flex-wrap justify-between items-center mb-10">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Welcome Admin! 👋</h1>
-          <p className="text-gray-500 mt-1">Hope you're having a productive day!</p>
+          <h1 className="text-3xl font-bold text-gray-800">
+            Welcome Admin! 👋
+          </h1>
+          <p className="text-gray-500 mt-1">
+            Hope you're having a productive day!
+          </p>
         </div>
         <div className="flex items-center space-x-4">
           <span className="text-gray-600 text-sm">
-            📅 {new Date().toLocaleDateString("en-US", {
+            📅{" "}
+            {new Date().toLocaleDateString("en-US", {
               weekday: "long",
               year: "numeric",
               month: "short",
@@ -99,82 +107,84 @@ const Dashboard = () => {
         <StatCard
           title="Total Blogs"
           value={postdata.length}
-          icon={<FaBlog className="text-blue-500 text-xl" />} color="text-blue-500"
+          icon={<FaBlog className="text-blue-500 text-xl" />}
+          color="text-blue-500"
         />
         <StatCard
           title="Total Submission"
           value={totalLeads}
-          icon={<FaFileAlt className="text-green-500 text-xl" />} color="text-green-500"
+          icon={<FaFileAlt className="text-green-500 text-xl" />}
+          color="text-green-500"
         />
         <StatCard
           title="Total Responses"
           value={totalResponses}
-          icon={<FaComments className="text-yellow-500 text-xl" />} color="text-yellow-500"
+          icon={<FaComments className="text-yellow-500 text-xl" />}
+          color="text-yellow-500"
         />
         <StatCard
           title="Total Likes"
           value="65.26K"
-          icon={<FaHeart className="text-red-500 text-xl" />} color="text-red-500"
+          icon={<FaHeart className="text-red-500 text-xl" />}
+          color="text-red-500"
         />
       </div>
 
-
       <div className="space-y-12">
-      {/* Submissions Table */}
-      <div>
-        <h2 className="text-xl font-semibold">Lead Submissions</h2>
-        <table className="min-w-full table-auto border mt-4">
-          <thead className="bg-gray-100 text-xs uppercase text-gray-500">
-            <tr>
-              <th className="px-6 py-3">Name</th>
-              <th className="px-6 py-3">Email</th>
-              <th className="px-6 py-3">Phone</th>
-              <th className="px-6 py-3">IP</th>
-              <th className="px-6 py-3">Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {submissions.map((lead) => (
-              <tr key={lead.id} className="border-b hover:bg-gray-50">
-                <td className="px-6 py-4">{lead.firstName} {lead.lastName}</td>
-                <td className="px-6 py-4">{lead.email || "—"}</td>
-                <td className="px-6 py-4">{lead.phone || "—"}</td>
-                <td className="px-6 py-4">{lead.fromIp || "—"}</td>
-                <td className="px-6 py-4">{new Date(lead.createdAt).toLocaleDateString()}</td>
+        {/* Submissions Table */}
+        <div>
+          <h2 className="text-xl font-semibold">Lead Submissions</h2>
+          <table className="min-w-full table-auto border mt-4">
+            <thead className="bg-gray-100 text-xs uppercase text-gray-500">
+              <tr>
+                <th className="px-6 py-3">Name</th>
+                <th className="px-6 py-3">Email</th>
+                <th className="px-6 py-3">Phone</th>
+                <th className="px-6 py-3">IP</th>
+                <th className="px-6 py-3">Date</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {submissions.map((lead) => (
+                <tr key={lead.id} className="border-b hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    {lead.firstName} {lead.lastName}
+                  </td>
+                  <td className="px-6 py-4">{lead.email || "—"}</td>
+                  <td className="px-6 py-4">{lead.phone || "—"}</td>
+                  <td className="px-6 py-4">{lead.fromIp || "—"}</td>
+                  <td className="px-6 py-4">
+                    {new Date(lead.createdAt).toLocaleDateString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-      {/* Responses Table */}
-      <div>
-        <h2 className="text-xl font-semibold ">Leads with Responses</h2>
-        <table className="min-w-full table-auto border mt-4 mb-10">
-          <thead className="bg-green-100 text-xs uppercase text-green-700">
-            <tr>
-              <th className="px-6 py-3">Lead ID</th>
-              <th className="px-6 py-3">Response</th>
-              <th className="px-6 py-3">Email</th>
-              <th className="px-6 py-3">Phone</th>
-              <th className="px-6 py-3">Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {responses.map((lead) => (
-              <tr key={lead.id} className="border-b hover:bg-green-50">
-                <td className="px-6 py-4">{lead.leadId}</td>
-                <td className="px-6 py-4">{lead.callrail?.response || "—"}</td>
-                <td className="px-6 py-4">{lead.callrail?.email || "—"}</td>
-                <td className="px-6 py-4">{lead.callrail?.phone_number || "—"}</td>
-                <td className="px-6 py-4">{new Date(lead.createdAt).toLocaleDateString()}</td>
+        {/* Responses Table */}
+        <div>
+          <h2 className="text-xl font-semibold ">Leads with Responses</h2>
+          <table className="min-w-full table-auto border mt-4 mb-10">
+            <thead className="bg-green-100 text-xs uppercase text-green-700">
+              <tr>
+                <th className="px-6 py-3">Lead ID</th>
+                <th className="px-6 py-3">Response</th>
+                <th className="px-6 py-3">Email</th>
+                <th className="px-6 py-3">Phone</th>
+                <th className="px-6 py-3">Date</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {responses.map((leadId, index) => (
+                <tr key={index} className="border-b hover:bg-green-50">
+                  <td className="px-6 py-4">{leadId}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
-
 
       <div className="col-span-1 lg:col-span-2">
         <div className="bg-white p-6 rounded-2xl shadow-xl">
@@ -195,16 +205,29 @@ const Dashboard = () => {
                   <stop offset="5%" stopColor="#6366f1" stopOpacity={0.9} />
                   <stop offset="95%" stopColor="#6366f1" stopOpacity={0.1} />
                 </linearGradient>
-                <linearGradient id="responseGradient" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient
+                  id="responseGradient"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
                   <stop offset="5%" stopColor="#16a34a" stopOpacity={0.8} />
                   <stop offset="95%" stopColor="#16a34a" stopOpacity={0.1} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="4 4" stroke="#e5e7eb" />
               <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#6b7280" }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 12, fill: "#6b7280" }}
+              />
               <Tooltip
-                contentStyle={{ backgroundColor: "#fff", borderColor: "#ddd", borderRadius: "8px" }}
+                contentStyle={{
+                  backgroundColor: "#fff",
+                  borderColor: "#ddd",
+                  borderRadius: "8px",
+                }}
                 labelStyle={{ color: "#374151", fontWeight: "bold" }}
                 itemStyle={{ fontSize: "14px", color: "#4b5563" }}
               />
@@ -232,7 +255,9 @@ const Dashboard = () => {
       <div className="mt-10">
         <div className="bg-white p-6 rounded-xl shadow-md">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">📝 Recent Blogs</h3>
+            <h3 className="text-lg font-semibold text-gray-800">
+              📝 Recent Blogs
+            </h3>
           </div>
           <BlogList openForm={openForm} />
         </div>
@@ -248,7 +273,9 @@ const Dashboard = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">{selectedBlog ? "Edit Blog" : "Create a New Blog"}</h3>
+              <h3 className="text-lg font-medium">
+                {selectedBlog ? "Edit Blog" : "Create a New Blog"}
+              </h3>
               <button
                 onClick={closeForm}
                 className="text-red-500 text-xl font-semibold"
@@ -281,7 +308,10 @@ const BlogList = ({ openForm }) => {
   return (
     <ul className="divide-y divide-gray-100 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300">
       {blogs.map((blog, index) => (
-        <li key={index} className="py-4 hover:bg-gray-50 px-2 rounded-md cursor-pointer transition">
+        <li
+          key={index}
+          className="py-4 hover:bg-gray-50 px-2 rounded-md cursor-pointer transition"
+        >
           <div>
             <p className="font-semibold text-gray-800">{blog.post_title}</p>
             <p className="text-sm text-gray-500 mt-1">

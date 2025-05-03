@@ -3,28 +3,21 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    const allLeads = await prisma.apiLead.findMany({
+    const leadIds = await prisma.apiLead.findMany({
       select: {
-        leadId: true,
-        callrail: true,
-        createdAt: true
+        leadId: true
       },
       orderBy: {
         createdAt: "desc"
       }
     });
 
-    // Filter out leads that have a non-null 'response' inside 'callrail'
-    const responses = allLeads.filter(lead => 
-      lead.callrail?.response !== undefined &&
-      lead.callrail?.response !== null
-    ).map(lead => ({
-      leadId: lead.leadId
-    }));
+    const onlyLeadIds = leadIds.map(item => item.leadId);
+    console.log("✅ Returning Lead IDs:", onlyLeadIds);
 
-    return NextResponse.json(responses);
+    return NextResponse.json(onlyLeadIds);
   } catch (error) {
-    console.error("Error fetching API responses:", error);
-    return NextResponse.json({ message: "Failed to fetch responses" }, { status: 500 });
+    console.error("❌ Error fetching lead IDs:", error);
+    return NextResponse.json({ message: "Failed to fetch lead IDs" }, { status: 500 });
   }
 }
