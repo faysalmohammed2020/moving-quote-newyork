@@ -6,7 +6,6 @@ import BlogPostForm from "@/components/blogForm";
 import { signOut, useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import {
-  BarChart,
   Bar,
   XAxis,
   YAxis,
