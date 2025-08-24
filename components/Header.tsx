@@ -1,29 +1,76 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, Menu, X } from "lucide-react";
 import Image from "next/image";
-//import { serviceBlogTitle } from "@/app/data/blogData";
 import { postdata } from "@/app/(main)/data/postdata";
 import { signOut, useSession } from "@/lib/auth-client";
+
+type BlogLite = { ID: number; post_title: string };
+
+const API_URL = "/api/blogs";
 
 const HeaderMenu: React.FC = () => {
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const { data: session } = useSession();
 
-  const filteredBlogs = postdata.filter((blog) =>
-    blog.post_title.toLowerCase().includes(searchQuery.toLowerCase())
+  // Seed with your static postdata; merge in API results on mount
+  const [blogs, setBlogs] = useState<BlogLite[]>(
+    (postdata as any[]).map((b) => ({ ID: b.ID, post_title: b.post_title }))
   );
+  const [loadingBlogs, setLoadingBlogs] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoadingBlogs(true);
+        const res = await fetch(API_URL, { cache: "no-store" });
+        if (!res.ok) return; // keep fallback
+        const rows = await res.json();
+        const fromDb: BlogLite[] = (rows as any[]).map((r) => ({
+          ID: Number(r.id),
+          post_title: r.post_title ?? "",
+        }));
+
+        if (!mounted) return;
+
+        // Merge: prefer DB rows when IDs collide, keep others from postdata
+        setBlogs((prev) => {
+          const map = new Map<number, BlogLite>();
+          prev.forEach((p) => map.set(p.ID, p)); // seed
+          fromDb.forEach((p) => map.set(p.ID, p)); // override with DB
+          return Array.from(map.values()).sort((a, b) => b.ID - a.ID);
+        });
+      } catch {
+        // swallow; fallback is already present
+      } finally {
+        if (mounted) setLoadingBlogs(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const filteredBlogs = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return blogs;
+    return blogs.filter((b) => b.post_title.toLowerCase().includes(q));
+  }, [blogs, searchQuery]);
+
   const highlightSearchTerm = (text: string, query: string): string => {
-    if (!query) return text; // If no query, return the text as is
-    const regex = new RegExp(`(${query})`, "gi"); // Case-insensitive match
+    if (!query) return text;
+    const safe = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // escape regex
+    const regex = new RegExp(`(${safe})`, "gi");
     return text.replace(
       regex,
-      (match) => `<span style="color: yellow;">${match}</span>`
+      (match) => `<span style="color: #fbbf24; font-weight: 600;">${match}</span>`
     );
   };
+
   return (
     <header className="bg-white shadow-md text-black">
       <nav className="container flex items-center justify-between py-4 px-6">
@@ -45,11 +92,7 @@ const HeaderMenu: React.FC = () => {
             onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}
             className="text-black"
           >
-            {isMobileMenuOpen ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Menu className="w-6 h-6" />
-            )}
+            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
 
@@ -70,23 +113,17 @@ const HeaderMenu: React.FC = () => {
             </div>
             <ul className="absolute z-50 left-0 mt-2 w-64 bg-gray-700 text-white shadow-lg rounded-md opacity-0 group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-in-out invisible h-auto">
               <li className="px-4 py-2 hover:bg-gray-900">
-                <Link href="/services/long-distance-moving">
-                  Long Distance Moving
-                </Link>
+                <Link href="/services/long-distance-moving">Long Distance Moving</Link>
               </li>
               <li className="px-4 py-2 hover:bg-gray-900">
                 <Link href="/services/auto-transport">Auto Transport</Link>
               </li>
               <li className="px-4 py-2 hover:bg-gray-900">
-                <Link href="/services/storage-solutions">
-                  Storage Solutions
-                </Link>
+                <Link href="/services/storage-solutions">Storage Solutions</Link>
               </li>
               <li className="group relative px-4 py-2 hover:bg-gray-900">
                 <div className="flex items-center cursor-pointer">
-                  <span className="hover:text-orange-400">
-                    Commercial Moving
-                  </span>
+                  <span className="hover:text-orange-400">Commercial Moving</span>
                   <ChevronDown className="ml-2 w-4 h-4" />
                 </div>
                 {/* Nested Dropdown */}
@@ -109,9 +146,7 @@ const HeaderMenu: React.FC = () => {
                 </ul>
               </li>
               <li className="px-4 py-2 hover:bg-gray-900">
-                <Link href="/services/specialized-moving">
-                  Specialized Moving
-                </Link>
+                <Link href="/services/specialized-moving">Specialized Moving</Link>
               </li>
               <li className="px-4 py-2 hover:bg-gray-900">
                 <Link href="/services/small-moves">Small Moves</Link>
@@ -139,16 +174,18 @@ const HeaderMenu: React.FC = () => {
             </Link>
           </li>
 
-          {/* Blog Dropdown */}
+          {/* Blog Dropdown (now fetching from API with fallback) */}
           <li className="group relative">
             <div className="flex items-center cursor-pointer hover:text-orange-500">
               <span className="text-lg">Blog</span>
               <ChevronDown className="ml-2 w-5 h-5 text-gray-300 transition-all duration-300 ease-in-out group-hover:rotate-180" />
             </div>
+
             <ul className="absolute z-50 left-0 mt-4 bg-gray-800 text-white shadow-lg rounded-lg opacity-0 group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-in-out invisible w-96 p-4">
-              <div className="bg-orange-600 w-32 p-2 rounded-full text-white text-sm font-semibold">
-                Total Blogs: {filteredBlogs.length}
+              <div className="bg-orange-600 w-36 p-2 rounded-full text-white text-sm font-semibold">
+                Total Blogs: {loadingBlogs ? "…" : blogs.length}
               </div>
+
               {/* Search Input */}
               <div className="mt-4 relative">
                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
@@ -162,22 +199,30 @@ const HeaderMenu: React.FC = () => {
                   className="w-80 p-3 pl-12 rounded-md bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 shadow-sm border border-gray-600 transition-all duration-300"
                 />
               </div>
-              <div className="scrollbar mt-4 space-y-4">
-                {filteredBlogs.length > 0 ? (
-                  filteredBlogs.map((id) => (
+
+              <div className="scrollbar mt-4 space-y-3 max-h-80 overflow-auto pr-1">
+                {loadingBlogs ? (
+                  // simple skeletons
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <div
+                      key={`sk-${i}`}
+                      className="h-9 w-full rounded-md bg-gray-700/70 animate-pulse"
+                    />
+                  ))
+                ) : filteredBlogs.length > 0 ? (
+                  filteredBlogs.map((item) => (
                     <li
-                      key={id.ID}
-                      className="group p-2 rounded-md bg-slate-700 hover:from-orange-500 hover:to-orange-400 transition-colors duration-300 ease-in-out shadow-md"
+                      key={item.ID}
+                      className="group p-2 rounded-md bg-slate-700 hover:bg-gradient-to-r hover:from-orange-500/80 hover:to-orange-400/80 transition-colors duration-300 ease-in-out shadow-md"
                     >
                       <Link
-                        href={`/blogs/${id.ID}`}
-                        className="text-sm sm:text-base font-medium text-gray-100 hover:underline hover:text-orange-600"
+                        href={`/blogs/${item.ID}`}
+                        className="block text-sm sm:text-base font-medium text-gray-100 hover:underline"
                       >
-                        {/* Highlight Matching Letters */}
                         <span
                           dangerouslySetInnerHTML={{
                             __html: highlightSearchTerm(
-                              id.post_title,
+                              item.post_title,
                               searchQuery
                             ),
                           }}
@@ -191,25 +236,24 @@ const HeaderMenu: React.FC = () => {
               </div>
             </ul>
           </li>
-
-          
-          
         </ul>
-        {/* Sign In Button */}
-        {
-            session ? (
-              <button 
-                onClick={() => signOut()} 
-                className="bg-red-500 text-white px-6 py-2 rounded-full hover:bg-red-600 transition-all duration-300"
-              >
-                Logout
-              </button>
-            ) : (
-              <Link href="/sign-in" className="bg-orange-500 text-white px-6 py-2 rounded-full hover:bg-orange-600 transition-all duration-300">
-                 Login
-              </Link>
-            
-          )}
+
+        {/* Auth Button */}
+        {session ? (
+          <button
+            onClick={() => signOut()}
+            className="bg-red-500 text-white px-6 py-2 rounded-full hover:bg-red-600 transition-all duration-300"
+          >
+            Logout
+          </button>
+        ) : (
+          <Link
+            href="/sign-in"
+            className="bg-orange-500 text-white px-6 py-2 rounded-full hover:bg-orange-600 transition-all duration-300"
+          >
+            Login
+          </Link>
+        )}
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (

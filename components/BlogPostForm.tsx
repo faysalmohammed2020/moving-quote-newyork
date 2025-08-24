@@ -210,7 +210,7 @@ const BlogPostForm: React.FC<BlogPostFormProps> = ({ blog, closeForm, onSaved })
 
       <div>
         <label htmlFor="tags" className="block text-sm font-medium text-gray-700">
-          Tags (comma separated)
+          Tags
         </label>
         <input
           type="text"
