@@ -5,7 +5,7 @@ const BlogTable: React.FC = () => {
   return (
     <>
     
-    <div className='pl-10 container mx-auto'>
+    <div>
     <AllBlogs/>
     </div>
     </>

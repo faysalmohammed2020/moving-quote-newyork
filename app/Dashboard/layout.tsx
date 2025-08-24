@@ -1,25 +1,25 @@
-import Sidebar from '@/components/SideBar';
-import React, { ReactNode } from 'react';
+import Sidebar from "@/components/SideBar";
+import React, { ReactNode } from "react";
 
 
-interface LayoutProps {
-  children: ReactNode;
+interface DashboardLayoutProps {
+  children: ReactNode; // Accepts nested routes or pages as children
 }
 
-const Layout: React.FC<LayoutProps> = ({ children }) => {
+const Layout: React.FC<DashboardLayoutProps> = ({ children }) => {
   return (
-    <>
-      <div className='flex '>
-      <div className='w-auto flex-shrink-0'>
-      <Sidebar/>
+    <div className="flex bg-gray-100">
+      {/* Sidebar */}
+      <div className="w-auto h-screen flex-shrink-0 bg-white">
+        <Sidebar />
       </div>
-      <main className="w-full"> 
+
+      {/* Main Content */}
+      <main className="flex-grow p-4 max-h-screen overflow-y-auto">
         {children}
       </main>
-      </div>
-    </>
+    </div>
   );
 };
 
 export default Layout;
- 

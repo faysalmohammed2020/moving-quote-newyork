@@ -99,3 +99,33 @@ model ApiLead {
   callrail  Json     
   createdAt DateTime @default(now()) 
 }
+
+model BlogPost {
+  id                    Int       @id @default(autoincrement())
+  post_author           Int?
+  tags                  String?
+  name                  String?
+  category              String?
+  post_date             DateTime?
+  post_date_gmt         DateTime?
+  post_content          Json?
+  post_title            String
+  post_excerpt          String?
+  post_status           String?
+  comment_status        String?
+  ping_status           String?
+  post_password         String?
+  post_name             String
+  to_ping               String?
+  pinged                String?
+  post_modified         DateTime?
+  post_modified_gmt     DateTime?
+  post_content_filtered String?
+  post_parent           Int?
+  guid                  String?
+  menu_order            Int?
+  post_type             String?
+  post_mime_type        String?
+  comment_count         Int?
+  createdAt             DateTime? @default(now())
+}
