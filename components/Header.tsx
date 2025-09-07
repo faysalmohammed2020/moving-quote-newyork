@@ -4,10 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, Menu, X } from "lucide-react";
 import Image from "next/image";
-import { postdata } from "@/app/(main)/data/postdata";
 import { signOut, useSession } from "@/lib/auth-client";
 
-type BlogLite = { ID: number; post_title: string };
+type BlogLite = { id: number; post_title: string };
 
 const API_URL = "/api/blogs";
 
@@ -16,10 +15,8 @@ const HeaderMenu: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const { data: session } = useSession();
 
-  // Seed with your static postdata; merge in API results on mount
-  const [blogs, setBlogs] = useState<BlogLite[]>(
-    (postdata as any[]).map((b) => ({ ID: b.ID, post_title: b.post_title }))
-  );
+  // ✅ শুধু ডাটাবেস থেকে
+  const [blogs, setBlogs] = useState<BlogLite[]>([]);
   const [loadingBlogs, setLoadingBlogs] = useState(false);
 
   useEffect(() => {
@@ -28,24 +25,12 @@ const HeaderMenu: React.FC = () => {
       try {
         setLoadingBlogs(true);
         const res = await fetch(API_URL, { cache: "no-store" });
-        if (!res.ok) return; // keep fallback
-        const rows = await res.json();
-        const fromDb: BlogLite[] = (rows as any[]).map((r) => ({
-          ID: Number(r.id),
-          post_title: r.post_title ?? "",
-        }));
-
+        if (!res.ok) throw new Error("Failed to load blogs");
+        const rows = (await res.json()) as BlogLite[];
         if (!mounted) return;
-
-        // Merge: prefer DB rows when IDs collide, keep others from postdata
-        setBlogs((prev) => {
-          const map = new Map<number, BlogLite>();
-          prev.forEach((p) => map.set(p.ID, p)); // seed
-          fromDb.forEach((p) => map.set(p.ID, p)); // override with DB
-          return Array.from(map.values()).sort((a, b) => b.ID - a.ID);
-        });
+        setBlogs(rows);
       } catch {
-        // swallow; fallback is already present
+        // error swallow; UI তে Total Blogs: … থাকবে
       } finally {
         if (mounted) setLoadingBlogs(false);
       }
@@ -58,12 +43,12 @@ const HeaderMenu: React.FC = () => {
   const filteredBlogs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return blogs;
-    return blogs.filter((b) => b.post_title.toLowerCase().includes(q));
+    return blogs.filter((b) => (b.post_title ?? "").toLowerCase().includes(q));
   }, [blogs, searchQuery]);
 
   const highlightSearchTerm = (text: string, query: string): string => {
     if (!query) return text;
-    const safe = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // escape regex
+    const safe = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const regex = new RegExp(`(${safe})`, "gi");
     return text.replace(
       regex,
@@ -174,7 +159,7 @@ const HeaderMenu: React.FC = () => {
             </Link>
           </li>
 
-          {/* Blog Dropdown (now fetching from API with fallback) */}
+          {/* Blog Dropdown (DB only) */}
           <li className="group relative">
             <div className="flex items-center cursor-pointer hover:text-orange-500">
               <span className="text-lg">Blog</span>
@@ -202,7 +187,6 @@ const HeaderMenu: React.FC = () => {
 
               <div className="scrollbar mt-4 space-y-3 max-h-80 overflow-auto pr-1">
                 {loadingBlogs ? (
-                  // simple skeletons
                   Array.from({ length: 5 }).map((_, i) => (
                     <div
                       key={`sk-${i}`}
@@ -212,11 +196,11 @@ const HeaderMenu: React.FC = () => {
                 ) : filteredBlogs.length > 0 ? (
                   filteredBlogs.map((item) => (
                     <li
-                      key={item.ID}
+                      key={item.id}
                       className="group p-2 rounded-md bg-slate-700 hover:bg-gradient-to-r hover:from-orange-500/80 hover:to-orange-400/80 transition-colors duration-300 ease-in-out shadow-md"
                     >
                       <Link
-                        href={`/blogs/${item.ID}`}
+                        href={`/blogs/${item.id}`}
                         className="block text-sm sm:text-base font-medium text-gray-100 hover:underline"
                       >
                         <span

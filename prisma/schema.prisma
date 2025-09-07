@@ -115,7 +115,7 @@ model BlogPost {
   comment_status        String?
   ping_status           String?
   post_password         String?
-  post_name             String
+  post_name             String? @unique
   to_ping               String?
   pinged                String?
   post_modified         DateTime?
