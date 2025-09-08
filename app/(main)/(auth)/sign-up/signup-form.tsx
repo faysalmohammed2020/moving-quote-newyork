@@ -24,49 +24,66 @@ import {
 import { Input } from "../../../../components/ui/input";
 import { Button } from "../../../../components/ui/button";
 import Link from "next/link";
-import { signUp } from "@/lib/auth-client";
+import { signIn } from "@/lib/auth-client"; // re-export from next-auth/react
 import { FormError } from "../../../../components/FormError";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+type SignUpValues = yup.InferType<typeof signUpSchema>;
+
 const SignupForm = () => {
   const [formError, setFormError] = useState("");
   const router = useRouter();
 
-  const form = useForm<yup.InferType<typeof signUpSchema>>({
+  const form = useForm<SignUpValues>({
     resolver: yupResolver(signUpSchema),
     defaultValues: {
       name: "",
       email: "",
       password: "",
-      
     },
   });
 
-  const onSubmit = async (values: yup.InferType<typeof signUpSchema>) => {
-    await signUp.email(
-      {
-        name: values.name,
-        password: values.password,
-        email: values.email,
-       
-      },
-      {
-        onRequest: () => {
-          setFormError("");
-          toast.loading;
-        },
-        onSuccess: () => {
-          toast.success("Account Creation Successful");
-          router.push("/");
-        },
-        onError: (ctx) => {
-          setFormError(ctx.error.message);
-          toast.error(ctx.error.message);
-        },
+  const onSubmit = async (values: SignUpValues) => {
+    setFormError("");
+    const dismiss = toast.loading("Creating your account...");
+
+    try {
+      // 1) Create user via your custom API
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const msg = data?.error || "Registration failed";
+        throw new Error(msg);
       }
-    );
+
+      // 2) Auto-login with NextAuth credentials provider
+      const signin = await signIn("credentials", {
+        email: values.email,
+        password: values.password,
+        redirect: false,
+      });
+
+      if (!signin?.ok) {
+        const msg = signin?.error || "Sign in after registration failed";
+        throw new Error(msg);
+      }
+
+      toast.dismiss(dismiss);
+      toast.success("Account created! You are now signed in.");
+      router.push("/Dashboard"); // ensure route exists & casing correct
+    } catch (err: any) {
+      toast.dismiss(dismiss);
+      const message = err?.message || "Something went wrong";
+      setFormError(message);
+      toast.error(message);
+    }
   };
 
   return (
@@ -86,7 +103,7 @@ const SignupForm = () => {
                   <FormItem>
                     <FormLabel>Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter your name" {...field} />
+                      <Input placeholder="Enter your name" autoComplete="name" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -102,6 +119,7 @@ const SignupForm = () => {
                       <Input
                         type="email"
                         placeholder="Enter email address"
+                        autoComplete="email"
                         {...field}
                       />
                     </FormControl>
@@ -119,6 +137,7 @@ const SignupForm = () => {
                       <Input
                         type="password"
                         placeholder="Enter password"
+                        autoComplete="new-password"
                         {...field}
                       />
                     </FormControl>
@@ -127,17 +146,17 @@ const SignupForm = () => {
                 )}
               />
             </FormFieldset>
+
             <FormError message={formError} />
+
             <Button variant="destructive" type="submit" className="mt-4 w-full">
               Sign Up
             </Button>
           </form>
         </Form>
+
         <div className="mt-5 space-x-1 text-center text-sm">
-          <Link
-            href="/"
-            className="text-sm text-muted-foreground hover:underline"
-          >
+          <Link href="/auth/sign-in" className="text-sm text-muted-foreground hover:underline">
             Already have an account?
           </Link>
         </div>

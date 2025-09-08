@@ -23,48 +23,61 @@ import {
 } from "../../../../components/ui/form";
 import { Input } from "../../../../components/ui/input";
 import { Button } from "../../../../components/ui/button";
-import { signIn, useSession } from "@/lib/auth-client";
+
+import { signIn, useSession } from "@/lib/auth-client"; // re-export from next-auth/react
 import { FormError } from "../../../../components/FormError";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import Link from 'next/link';
+import Link from "next/link";
 
+type SignInValues = yup.InferType<typeof signInSchema>;
 
 const SigninForm = () => {
   const [formError, setFormError] = useState("");
   const router = useRouter();
-  const session = useSession();
+  const { data: session } = useSession();
 
-  const form = useForm<yup.InferType<typeof signInSchema>>({
+  const form = useForm<SignInValues>({
     resolver: yupResolver(signInSchema),
     defaultValues: {
       email: "",
       password: "",
-      role: "",
+      // role field থাকলে schema থেকে বাদ দাও, না হলে default রাখলেও ব্যবহার করবো না
+      // role: "",
     },
   });
 
-  const onSubmit = async (values: yup.InferType<typeof signInSchema>) => {
-    await signIn.email(
-      {
+  const onSubmit = async (values: SignInValues) => {
+    try {
+      setFormError("");
+
+      // NextAuth style sign in
+      const res = await signIn("credentials", {
         email: values.email,
         password: values.password,
-      },
-      {
-        onRequest: () => {
-          setFormError("");
-        },
-        onSuccess: () => {
-          console.log(session.data);
-          toast.success("Login Successful");
-          router.push("/Dashboard");
-        },
-        onError: (ctx) => {
-          setFormError(ctx.error.message);
-        },
+        redirect: false, // আমরা নিজে route করব
+      });
+
+      // res can be null (rare), or with { ok, error, status, url }
+      if (res?.ok) {
+        toast.success("Login Successful");
+        // console.log(session); // মনে রাখো: এই মুহূর্তে session stale থাকতে পারে
+        router.push("/Dashboard"); // নিশ্চিত হও path ছোট হাতের কিনা
+        return;
       }
-    );
+
+      // handled error
+      const message =
+        res?.error ||
+        "Invalid credentials. Please check your email and password.";
+      setFormError(message);
+      toast.error(message);
+    } catch (e: any) {
+      const message = e?.message || "Something went wrong while signing in.";
+      setFormError(message);
+      toast.error(message);
+    }
   };
 
   return (
@@ -87,6 +100,7 @@ const SigninForm = () => {
                       <Input
                         type="email"
                         placeholder="Enter email address"
+                        autoComplete="email"
                         {...field}
                       />
                     </FormControl>
@@ -104,6 +118,7 @@ const SigninForm = () => {
                       <Input
                         type="password"
                         placeholder="Enter password"
+                        autoComplete="current-password"
                         {...field}
                       />
                     </FormControl>
@@ -112,15 +127,18 @@ const SigninForm = () => {
                 )}
               />
             </FormFieldset>
+
             <FormError message={formError} />
+
             <Button variant="destructive" type="submit" className="mt-4 w-full">
               Sign In
             </Button>
           </form>
         </Form>
+
         <div className="mt-5 space-x-1 text-center text-sm">
           <Link
-            href="/auth/sign-up"
+            href="/auth/forgot-password" // আগে sign-up ছিল; টেক্সট অনুযায়ী forgot-password রাখা হলো
             className="text-sm text-muted-foreground hover:underline"
           >
             Forgot password?

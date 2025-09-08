@@ -1,21 +1,10 @@
-import { createAuthClient } from "better-auth/react";
-import { inferAdditionalFields, adminClient } from "better-auth/client/plugins";
-import { auth } from "./auth";
+// lib/auth-client.ts
+// Client-side helpers
+export { signIn, signOut, useSession } from "next-auth/react";
+// Server-side session (App Router / RSC safe):
+export { auth } from "@/lib/auth";
 
-// Create a single authentication client instance
-export const authClient = createAuthClient({
-  plugins: [inferAdditionalFields<typeof auth>(), adminClient()],
-});
-
-// Destructure authentication functions
-export const {
-  signIn,
-  signUp,
-  signOut,
-  useSession,
-  admin,
-  getSession,
-  updateUser,
-  changeEmail,
-  changePassword,
-} = authClient;
+// Utility: admin checker (BetterAuth admin plugin-এর সমমান)
+export function isAdmin(role?: string) {
+  return role === "ADMIN" || role === "MODERATOR";
+}

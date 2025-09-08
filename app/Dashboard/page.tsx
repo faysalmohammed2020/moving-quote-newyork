@@ -93,7 +93,12 @@ const Dashboard = () => {
           </span>
           {session && (
             <button
-              onClick={() => signOut().then(() => router.push("/sign-in"))}
+             onClick={() =>
+        signOut({
+          redirect: true,
+          callbackUrl: "/sign-in", // 🔑 লগআউট শেষে যেই পেজে যাবে
+        })
+      }
               className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
             >
               Logout
