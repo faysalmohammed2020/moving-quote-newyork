@@ -64,7 +64,7 @@ const SigninForm = () => {
         toast.success("Login Successful", {
           description: "Welcome back to your dashboard",
         });
-        router.push("/Dashboard");
+        router.push("/admin/dashboard");
         return;
       }
 

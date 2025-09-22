@@ -6,7 +6,7 @@ const Footer: React.FC = () => {
     <footer className="mt-72 bg-[#1C1C1C] text-white py-4">
       <div className="container mx-auto text-center">
         <nav className="mb-2">
-          <Link href="/Home" className="mx-2 hover:underline">
+          <Link href="/home" className="mx-2 hover:underline">
             Home
           </Link>
           <Link href="/services" className="mx-2 hover:underline">

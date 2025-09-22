@@ -82,7 +82,7 @@ const SignupForm = () => {
       toast.success("Account Created", {
         description: "Your account has been successfully created!",
       });
-      router.push("/Dashboard");
+      router.push("/admin/dashboard");
     } catch (err: any) {
       const message = err?.message || "Something went wrong";
       setFormError(message);

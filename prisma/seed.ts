@@ -1,13 +1,14 @@
 /* eslint-disable no-console */
-import { PrismaClient, Prisma } from '@prisma/client' // ← Prisma ইমপোর্ট দরকার
+import { PrismaClient, Prisma } from '@prisma/client'
+import bcrypt from 'bcryptjs'
 import { postdata } from '../app/(main)/data/postdata'
 
 const prisma = new PrismaClient()
 
-// JSON helper: JSON ফিল্ডে null পাঠাতে Prisma.DbNull/JsonNull ব্যবহার করুন
+// JSON helper
 const jsonOrNull = (v: unknown) => {
-  if (v === undefined || v === null) return Prisma.DbNull // ডাটাবেজ NULL
-  return v // string/object/array/number/boolean সবই JSON ভ্যালিড
+  if (v === undefined || v === null) return Prisma.DbNull
+  return v
 }
 
 // Date helper
@@ -16,7 +17,27 @@ const parseDate = (d: string | null | undefined): Date | null => {
   return new Date(String(d).replace(' ', 'T'))
 }
 
-async function main() {
+async function seedAdmin() {
+  const email = 'admin@example.com'
+  const password = 'admin123' 
+  const hashedPassword = await bcrypt.hash(password, 10)
+
+  const admin = await prisma.user.upsert({
+    where: { email },
+    update: {
+    },
+    create: {
+      email,
+      role: 'ADMIN',
+      passwordHash: hashedPassword,
+      name: 'Admin User',
+    },
+  })
+
+  console.log(`✅ Admin user ready: ${admin.email}`)
+}
+
+async function seedBlogPosts() {
   console.log(`🌱 Seeding BlogPost… Total posts: ${postdata.length}`)
 
   let created = 0
@@ -34,11 +55,7 @@ async function main() {
         : null,
       post_date: parseDate(p.post_date),
       post_date_gmt: parseDate(p.post_date_gmt),
-
-      // ❗ এখানে আগের মতো JSON.stringify করবেন না
-      // null হলে Prisma.DbNull/JsonNull ব্যবহার করুন
       post_content: jsonOrNull(p.post_content),
-
       post_title: String(p.post_title ?? ''),
       post_excerpt: p.post_excerpt ? String(p.post_excerpt) : null,
       post_status: p.post_status ? String(p.post_status) : null,
@@ -57,18 +74,17 @@ async function main() {
       post_type: p.post_type ? String(p.post_type) : null,
       post_mime_type: p.post_mime_type ? String(p.post_mime_type) : null,
       comment_count: p.comment_count ? Number(p.comment_count) : null,
-      // createdAt: Prisma-তে default(now()) আছে, তাই দরকার নেই
+      // createdAt: default(now())
     }
 
-    // 🔎 findUnique নয়—কারণ guid/post_name unique নয়
-    const existing = await prisma.blogPost.findFirst({
-      where: {
-        OR: [
-          data.guid ? { guid: data.guid } : undefined,
-          data.post_name ? { post_name: data.post_name } : undefined,
-        ].filter(Boolean) as any[],
-      },
-    })
+    const ors = [
+      data.guid ? { guid: data.guid } : undefined,
+      data.post_name ? { post_name: data.post_name } : undefined,
+    ].filter(Boolean) as any[]
+
+    const existing = ors.length
+      ? await prisma.blogPost.findFirst({ where: { OR: ors } })
+      : null
 
     if (existing) {
       await prisma.blogPost.update({
@@ -84,7 +100,12 @@ async function main() {
     }
   }
 
-  console.log(`🎉 Done. Created: ${created}, Updated: ${updated}`)
+  console.log(`🎉 BlogPost done. Created: ${created}, Updated: ${updated}`)
+}
+
+async function main() {
+  await seedAdmin()
+  await seedBlogPosts()
 }
 
 main()
