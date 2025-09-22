@@ -23,8 +23,8 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   pages: {
-    signIn: "/auth/sign-in", // ✅ তোমার কাস্টম সাইন-ইন রুট
-    // error: "/auth/sign-in", // চাইলে error পেজও একই রাখো
+    signIn: "/auth/sign-in", 
+    
   },
   callbacks: {
     async jwt({ token, user }) {
