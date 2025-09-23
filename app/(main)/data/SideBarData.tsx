@@ -18,14 +18,14 @@ export interface SidebarItem {
 export const sidebarItems: SidebarItem[] = [
   // Dashboard
   {
-    href: "/Dashboard",
+    href: "/admin/dashboard",
     label: "Dashboard",
     icon: <LuLayoutDashboard className="size-6" />,
   },
 
   // Blog Management
   {
-    href: "/Dashboard/BlogManagement",
+    href: "/admin/dashboard/BlogManagement",
     label: "Blog Management",
     icon: <FaPenFancy className="size-6" />,
   },

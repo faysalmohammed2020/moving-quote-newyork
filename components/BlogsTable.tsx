@@ -44,19 +44,8 @@ function setStatusLocal(
 }
 
 const AllBlogs: React.FC = () => {
-  // seed from your postdata and normalize category/tags to strings
-  const [posts, setPosts] = useState<UPost[]>(
-    (postdata as any[]).map((p) => ({
-      ID: p.ID,
-      post_title: p.post_title,
-      post_content: p.post_content ?? "",
-      post_status: p.post_status ?? "Draft",
-      comment_status: p.comment_status ?? "Open",
-      category: toLabel((p as any).category),
-      tags: toLabel((p as any).tags),
-      __fromDB: false,
-    }))
-  );
+  // ✅ Start empty; we'll load from DB and only fallback to postdata if DB fails
+  const [posts, setPosts] = useState<UPost[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [selectedBlog, setSelectedBlog] = useState<UPost | null>(null);
@@ -75,15 +64,31 @@ const AllBlogs: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Load posts from DB and merge into table (keeps postdata too)
+  // Load posts from DB; if it fails, fall back to local postdata (no merging!)
   const loadDbPosts = async () => {
     try {
       setLoading(true);
       const res = await fetch(API_URL, { cache: "no-store" });
-      if (!res.ok) return; // keep UI working with postdata-only
+
+      if (!res.ok) {
+        // Fallback to local postdata
+        const fallback: UPost[] = (postdata as any[]).map((p) => ({
+          ID: Number(p.ID),
+          post_title: p.post_title,
+          post_content: p.post_content ?? "",
+          post_status: p.post_status ?? "Draft",
+          comment_status: p.comment_status ?? "Open",
+          category: toLabel((p as any).category),
+          tags: toLabel((p as any).tags),
+          __fromDB: false,
+        }));
+        setPosts(fallback.sort((a, b) => b.ID - a.ID));
+        return;
+      }
+
       const dbRows = await res.json();
       const normalized: UPost[] = (dbRows as any[]).map((r) => ({
-        ID: r.id,
+        ID: Number(r.id),
         post_title: r.post_title ?? "",
         post_content: typeof r.post_content === "string" ? r.post_content : toLabel(r.post_content),
         post_status: r.post_status ?? "Draft",
@@ -92,11 +97,9 @@ const AllBlogs: React.FC = () => {
         tags: toLabel(r.tags),
         __fromDB: true,
       }));
-      setPosts((prev) => {
-        const m = new Map(prev.map((p) => [p.ID, p]));
-        normalized.forEach((dbp) => m.set(dbp.ID, dbp));
-        return Array.from(m.values()).sort((a, b) => b.ID - a.ID);
-      });
+
+      // ✅ Replace (do not merge with postdata) to avoid double count
+      setPosts(normalized.sort((a, b) => b.ID - a.ID));
     } finally {
       setLoading(false);
     }
@@ -236,7 +239,7 @@ const AllBlogs: React.FC = () => {
         const created = await res.json();
         setPosts((prev) => [
           {
-            ID: created.id,
+            ID: Number(created.id),
             post_title: created.post_title,
             post_content:
               typeof created.post_content === "string"
@@ -254,7 +257,7 @@ const AllBlogs: React.FC = () => {
         // fallback to local-only add if server rejects
         setPosts((prev) => [
           {
-            ID: prev.length ? Math.max(...prev.map((p) => p.ID)) + 1 : 1,
+            ID: prev.length ? Math.max(...prev.map((p) => Number(p.ID))) + 1 : 1,
             post_title: newPost.post_title,
             post_content: newPost.post_content,
             post_status: "Draft",
@@ -270,7 +273,7 @@ const AllBlogs: React.FC = () => {
       // local-only add
       setPosts((prev) => [
         {
-          ID: prev.length ? Math.max(...prev.map((p) => p.ID)) + 1 : 1,
+          ID: prev.length ? Math.max(...prev.map((p) => Number(p.ID))) + 1 : 1,
           post_title: newPost.post_title,
           post_content: newPost.post_content,
           post_status: "Draft",
@@ -348,13 +351,13 @@ const AllBlogs: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-green-500">
           <h3 className="text-lg font-medium text-gray-700">Published</h3>
           <p className="text-3xl font-bold text-gray-900">
-            {posts.filter(p => p.post_status === "Published").length}
+            {posts.filter((p) => p.post_status === "Published").length}
           </p>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-yellow-500">
           <h3 className="text-lg font-medium text-gray-700">Drafts</h3>
           <p className="text-3xl font-bold text-gray-900">
-            {posts.filter(p => p.post_status === "Draft").length}
+            {posts.filter((p) => p.post_status === "Draft").length}
           </p>
         </div>
       </div>
@@ -364,8 +367,19 @@ const AllBlogs: React.FC = () => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="relative w-full md:w-96">
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <svg
+                className="w-5 h-5 text-gray-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
               </svg>
             </div>
             <input
@@ -380,7 +394,13 @@ const AllBlogs: React.FC = () => {
             onClick={() => setIsModalOpen(true)}
             className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-medium py-2.5 px-6 rounded-lg hover:from-blue-700 hover:to-indigo-800 transition-all transform hover:-translate-y-0.5 shadow-md flex items-center"
           >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <svg
+              className="w-5 h-5 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
             Add New Post
@@ -394,11 +414,21 @@ const AllBlogs: React.FC = () => {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  ID
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Title
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Category
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -414,19 +444,35 @@ const AllBlogs: React.FC = () => {
               ) : filteredPosts.length === 0 ? (
                 <tr>
                   <td className="px-6 py-8 text-center" colSpan={5}>
-                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <svg
+                      className="mx-auto h-12 w-12 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
                     </svg>
                     <h3 className="mt-4 text-lg font-medium text-gray-900">No posts found</h3>
                     <p className="mt-1 text-gray-500">Try adjusting your search query or create a new post.</p>
                   </td>
                 </tr>
               ) : (
-                filteredPosts.map((blog, index) => (
+                filteredPosts.map((blog) => (
                   <tr key={blog.ID} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{blog.ID}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {blog.ID}
+                    </td>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900 max-w-xs truncate">
-                      <Link href={`/blogs/${blog.ID}`} className="text-blue-600 hover:text-blue-800 transition-colors">
+                      <Link
+                        href={`/blogs/${blog.ID}`}
+                        className="text-blue-600 hover:text-blue-800 transition-colors"
+                      >
                         {blog.post_title}
                       </Link>
                     </td>
@@ -436,10 +482,12 @@ const AllBlogs: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
                         ${(blog.post_status ?? "Draft") === "Published" 
                           ? "bg-green-100 text-green-800" 
-                          : "bg-yellow-100 text-yellow-800"}`}>
+                          : "bg-yellow-100 text-yellow-800"}`}
+                      >
                         {toLabel(blog.post_status) || "Draft"}
                       </span>
                     </td>
@@ -451,8 +499,19 @@ const AllBlogs: React.FC = () => {
                             className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors shadow-sm"
                             title="Publish"
                           >
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <svg
+                              className="w-4 h-4 mr-1"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
                             </svg>
                             Publish
                           </button>
@@ -462,8 +521,19 @@ const AllBlogs: React.FC = () => {
                             className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-colors shadow-sm"
                             title="Set Draft"
                           >
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            <svg
+                              className="w-4 h-4 mr-1"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                              />
                             </svg>
                             Unpublish
                           </button>
@@ -474,8 +544,19 @@ const AllBlogs: React.FC = () => {
                           className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                           title="Edit Blog"
                         >
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          <svg
+                            className="w-4 h-4 mr-1"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                            />
                           </svg>
                           Edit
                         </button>
@@ -485,8 +566,19 @@ const AllBlogs: React.FC = () => {
                           className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors shadow-sm"
                           title="Delete Blog"
                         >
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <svg
+                            className="w-4 h-4 mr-1"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
                           </svg>
                           Delete
                         </button>
@@ -503,14 +595,23 @@ const AllBlogs: React.FC = () => {
       {/* Add New Post Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-xl font-semibold text-gray-900">Add New Blog Post</h3>
-              <button 
+              <button
                 onClick={() => setIsModalOpen(false)}
                 className="text-gray-400 hover:text-gray-500 transition-colors"
               >
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -549,7 +650,7 @@ const AllBlogs: React.FC = () => {
                 </div>
                 <div className="mb-6">
                   <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-1">
-                    Tags 
+                    Tags
                   </label>
                   <input
                     type="text"
@@ -577,8 +678,8 @@ const AllBlogs: React.FC = () => {
                   >
                     Cancel
                   </button>
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
                   >
                     Add Post
@@ -593,14 +694,20 @@ const AllBlogs: React.FC = () => {
       {/* Edit Modal */}
       {selectedBlog && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-xl font-semibold text-gray-900">Edit Blog Post</h3>
-              <button 
-                onClick={() => setSelectedBlog(null)}
-                className="text-gray-400 hover:text-gray-500 transition-colors"
-              >
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <button onClick={() => setSelectedBlog(null)} className="text-gray-400 hover:text-gray-500 transition-colors">
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -639,7 +746,7 @@ const AllBlogs: React.FC = () => {
                 </div>
                 <div className="mb-6">
                   <label htmlFor="edit_tags" className="block text-sm font-medium text-gray-700 mb-1">
-                    Tags 
+                    Tags
                   </label>
                   <input
                     type="text"
@@ -667,8 +774,8 @@ const AllBlogs: React.FC = () => {
                   >
                     Cancel
                   </button>
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
                   >
                     Save Changes

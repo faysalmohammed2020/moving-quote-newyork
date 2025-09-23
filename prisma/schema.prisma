@@ -25,33 +25,19 @@ model User {
   emailVerified DateTime?                      
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  sessions      Session[]
   accounts      Account[]
 
   @@map("users") 
 }
 
-model Session {
-  id           String   @id @default(cuid())
-  expires      DateTime @map("expiresAt")
-  sessionToken String   @unique @map("token")
-  role         String?
-  createdAt    DateTime
-  updatedAt    DateTime
-  ipAddress    String?
-  userAgent    String?
-  userId String
-  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("sessions")
-}
 
 model Account {
   id                    String   @id @default(cuid())
   provider              String   @map("providerId")
   providerAccountId     String   @map("accountId")
   type                  String   @default("oauth") 
-  role                  String?
+  role                  String
   userId                String
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   access_token          String?  @map("accessToken")
