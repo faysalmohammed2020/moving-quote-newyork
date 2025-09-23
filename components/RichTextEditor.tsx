@@ -15,7 +15,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 }) => {
   return (
     <Editor
-      apiKey="cqgdnpgejsheguxqfltluvhxy507j6a8rad5f1ycaqog6fsd"
+      apiKey="didaagwh80y1vdeim49h9hsorsljm8n5mmr713t1r6n5m4zr"
       init={{
         height: height,
         menubar: true,
