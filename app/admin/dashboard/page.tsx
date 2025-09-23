@@ -1,10 +1,9 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { postdata } from "@/app/(main)/data/postdata";
-import { FaBlog, FaFileAlt, FaComments, FaHeart, FaSignOutAlt, FaCalendarAlt, FaChartLine } from "react-icons/fa";
+import { FaBlog, FaFileAlt, FaComments, FaHeart, FaCalendarAlt, FaChartLine } from "react-icons/fa";
 import { IoIosAddCircle } from "react-icons/io";
 import BlogPostForm from "@/components/blogForm";
-import { signOut, useSession } from "@/lib/auth-client";
+import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import {
   Bar,
@@ -19,56 +18,92 @@ import {
 } from "recharts";
 import axios from "axios";
 
+type Blog = {
+  id: number;
+  post_title: string;
+  post_content: string;
+  category: string;
+  tags?: string | null;
+  post_status: string;
+  createdAt?: string;
+  post_date?: string;
+};
+
 const Dashboard = () => {
   const [isFormVisible, setFormVisible] = useState(false);
-  const [selectedBlog, setSelectedBlog] = useState(null);
+  const [selectedBlog, setSelectedBlog] = useState<Blog | null>(null);
   const { data: session } = useSession();
   const router = useRouter();
 
-  const [stats, setStats] = useState({ dailyLeads: [], dailyResponses: [] });
+  const [stats, setStats] = useState({ dailyLeads: [] as any[], dailyResponses: [] as any[] });
   const [totalLeads, setTotalLeads] = useState(0);
   const [totalResponses, setTotalResponses] = useState(0);
-  const [submissions, setSubmissions] = useState([]);
-  const [responses, setResponses] = useState([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [responses, setResponses] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // ✅ Blogs state (fetched from /api/blogs)
+  const [blogs, setBlogs] = useState<Blog[]>([]);
+  const [blogsLoading, setBlogsLoading] = useState<boolean>(false);
+  const [blogsError, setBlogsError] = useState<string | null>(null);
+
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchDashboardData = async () => {
       try {
         setIsLoading(true);
         const [statsRes, subRes, respRes] = await Promise.all([
           fetch("/api/admin/leads/stats"),
           axios.get("/api/admin/leads/submissions"),
-          axios.get("/api/admin/leads/responses")
+          axios.get("/api/admin/leads/responses"),
         ]);
-        
+
         const statsData = await statsRes.json();
         setStats({
           dailyLeads: statsData.dailyLeads,
           dailyResponses: statsData.dailyResponses,
         });
-        setTotalLeads(statsData.totalLeads);
-        setTotalResponses(statsData.totalResponses);
-        setSubmissions(subRes.data);
-        setResponses(respRes.data);
+        setTotalLeads(statsData.totalLeads ?? 0);
+        setTotalResponses(statsData.totalResponses ?? 0);
+        setSubmissions(subRes.data ?? []);
+        setResponses(respRes.data ?? []);
       } catch (error) {
-        console.error("Failed to fetch data", error);
+        console.error("Failed to fetch dashboard data", error);
       } finally {
         setIsLoading(false);
       }
     };
-    
-    fetchData();
+
+    fetchDashboardData();
   }, []);
 
-  const openForm = (blog = null) => {
+  // ✅ Fetch blogs from API: /api/blogs
+  const loadBlogs = async () => {
+    try {
+      setBlogsLoading(true);
+      setBlogsError(null);
+      const res = await axios.get<Blog[]>("/api/blogs");
+      setBlogs(res.data || []);
+    } catch (err) {
+      console.error("Failed to fetch blogs", err);
+      setBlogsError("Failed to fetch blog posts.");
+    } finally {
+      setBlogsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBlogs();
+  }, []);
+
+  const openForm = (blog: Blog | null = null) => {
     setSelectedBlog(blog);
     setFormVisible(true);
   };
 
-  const closeForm = () => {
+  const closeForm = (shouldReload?: boolean) => {
     setFormVisible(false);
     setSelectedBlog(null);
+    if (shouldReload) loadBlogs();
   };
 
   return (
@@ -76,11 +111,9 @@ const Dashboard = () => {
       {/* Header Section */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-            Admin Dashboard
-          </h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Admin Dashboard</h1>
           <p className="text-gray-500 mt-1 text-sm">
-            Welcome back, {session?.user?.name || 'Admin'}! Here's what's happening today.
+            Welcome back, {session?.user?.name || "Admin"}! Here's what's happening today.
           </p>
         </div>
         <div className="flex items-center space-x-4 mt-4 md:mt-0">
@@ -93,20 +126,6 @@ const Dashboard = () => {
               day: "numeric",
             })}
           </span>
-          {/* {session && (
-            <button
-              onClick={() =>
-                signOut({
-                  redirect: true,
-                  callbackUrl: "/sign-in",
-                })
-              }
-              className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition flex items-center text-sm"
-            >
-              <FaSignOutAlt className="mr-2" />
-              Logout
-            </button>
-          )} */}
         </div>
       </header>
 
@@ -114,7 +133,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         <StatCard
           title="Total Blogs"
-          value={postdata.length}
+          value={blogsLoading ? "…" : blogs.length}
           icon={<FaBlog className="text-blue-500 text-xl" />}
           color="bg-blue-100"
           textColor="text-blue-600"
@@ -158,7 +177,7 @@ const Dashboard = () => {
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
-              data={stats.dailyLeads.map((lead, index) => ({
+              data={stats.dailyLeads.map((lead: any, index: number) => ({
                 date: lead.date,
                 leads: lead.count,
                 responses: stats.dailyResponses[index]?.count || 0,
@@ -170,54 +189,27 @@ const Dashboard = () => {
                   <stop offset="5%" stopColor="#6366f1" stopOpacity={0.9} />
                   <stop offset="95%" stopColor="#6366f1" stopOpacity={0.1} />
                 </linearGradient>
-                <linearGradient
-                  id="responseGradient"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
+                <linearGradient id="responseGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#16a34a" stopOpacity={0.8} />
                   <stop offset="95%" stopColor="#16a34a" stopOpacity={0.1} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-              <XAxis 
-                dataKey="date" 
-                tick={{ fontSize: 12, fill: "#6b7280" }} 
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                allowDecimals={false}
-                tick={{ fontSize: 12, fill: "#6b7280" }}
-                axisLine={false}
-                tickLine={false}
-              />
+              <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: "#fff",
                   border: "none",
                   borderRadius: "8px",
-                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)"
+                  boxShadow:
+                    "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
                 }}
                 labelStyle={{ color: "#374151", fontWeight: "bold", fontSize: "14px" }}
                 itemStyle={{ fontSize: "14px", color: "#4b5563" }}
               />
-              <Legend 
-                verticalAlign="top" 
-                height={36} 
-                iconType="circle" 
-                iconSize={10}
-                wrapperStyle={{ fontSize: "12px", paddingBottom: "20px" }}
-              />
-              <Bar
-                dataKey="leads"
-                fill="url(#leadGradient)"
-                radius={[4, 4, 0, 0]}
-                name="Submissions"
-                barSize={24}
-              />
+              <Legend verticalAlign="top" height={36} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: "12px", paddingBottom: "20px" }} />
+              <Bar dataKey="leads" fill="url(#leadGradient)" radius={[4, 4, 0, 0]} name="Submissions" barSize={24} />
               <Line
                 type="monotone"
                 dataKey="responses"
@@ -251,7 +243,7 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {submissions.slice(0, 5).map((lead) => (
+                {submissions.slice(0, 5).map((lead: any) => (
                   <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="font-medium text-gray-900">
@@ -299,7 +291,7 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {responses.slice(0, 5).map((leadId, index) => (
+                {responses.slice(0, 5).map((leadId: any, index: number) => (
                   <tr key={index} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="font-medium text-gray-900">{leadId}</div>
@@ -310,7 +302,7 @@ const Dashboard = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-xs text-gray-500">
-                        {new Date(leadId.date).toLocaleDateString()}
+                        {leadId?.date ? new Date(leadId.date).toLocaleDateString() : "—"}
                       </div>
                     </td>
                   </tr>
@@ -332,7 +324,7 @@ const Dashboard = () => {
       <div className="bg-white rounded-xl shadow-sm p-6 mt-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-semibold text-gray-800">Recent Blog Posts</h2>
-          <button 
+          <button
             onClick={() => openForm()}
             className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center"
           >
@@ -340,7 +332,11 @@ const Dashboard = () => {
             New Post
           </button>
         </div>
-        <BlogList openForm={openForm} />
+
+        {blogsError && (
+          <div className="text-sm text-red-600 mb-3">{blogsError}</div>
+        )}
+        <BlogList openForm={openForm} blogs={blogs} loading={blogsLoading} />
       </div>
 
       {/* Blog Form Modal */}
@@ -355,7 +351,7 @@ const Dashboard = () => {
                 {selectedBlog ? "Edit Blog Post" : "Create New Blog Post"}
               </h3>
               <button
-                onClick={closeForm}
+                onClick={() => closeForm(false)}
                 className="text-gray-400 hover:text-gray-600 transition"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -364,7 +360,8 @@ const Dashboard = () => {
               </button>
             </div>
             <div className="p-6">
-              <BlogPostForm blog={selectedBlog} closeForm={closeForm} />
+              {/* Pass closeForm so the form can call closeForm(true) after successful submit to refetch */}
+              <BlogPostForm blog={selectedBlog as any} closeForm={closeForm} />
             </div>
           </div>
         </div>
@@ -373,12 +370,10 @@ const Dashboard = () => {
   );
 };
 
-const StatCard = ({ title, value, icon, color, textColor }) => (
+const StatCard = ({ title, value, icon, color, textColor }: any) => (
   <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
     <div className="flex items-center">
-      <div className={`p-3 rounded-lg ${color} ${textColor}`}>
-        {icon}
-      </div>
+      <div className={`p-3 rounded-lg ${color} ${textColor}`}>{icon}</div>
       <div className="ml-4">
         <h4 className="text-sm font-medium text-gray-500">{title}</h4>
         <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
@@ -387,25 +382,33 @@ const StatCard = ({ title, value, icon, color, textColor }) => (
   </div>
 );
 
-const BlogList = ({ openForm }) => {
-  const blogs = postdata.slice(0, 5);
-  
+const BlogList = ({ openForm, blogs, loading }: { openForm: (b?: Blog | null) => void; blogs: Blog[]; loading: boolean }) => {
+  const recent = blogs?.slice(0, 5) ?? [];
+
+  if (loading) {
+    return <div className="text-sm text-gray-500">Loading blogs…</div>;
+  }
+
+  if (!recent.length) {
+    return <div className="text-sm text-gray-500">No blog posts found.</div>;
+  }
+
   return (
     <div className="divide-y divide-gray-100">
-      {blogs.map((blog, index) => (
+      {recent.map((blog) => (
         <div
-          key={index}
+          key={blog.id}
           className="py-4 hover:bg-gray-50 px-2 rounded-md cursor-pointer transition flex justify-between items-center"
           onClick={() => openForm(blog)}
         >
           <div>
             <p className="font-semibold text-gray-800">{blog.post_title}</p>
             <p className="text-sm text-gray-500 mt-1">
-              {blog.post_status} • {blog.comment_status} Comments
+              {blog.category} • {blog.post_status}
             </p>
           </div>
           <span className="text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-600">
-            {new Date(blog.post_date).toLocaleDateString()}
+            {new Date(blog.post_date || blog.createdAt || "").toLocaleDateString()}
           </span>
         </div>
       ))}
