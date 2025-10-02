@@ -12,10 +12,6 @@ import Link from "next/link";
 const Categories = () => {
   return (
     <div className="container mx-auto mt-12 mb-12 px-4">
-      <h2 className="text-4xl font-bold text-center text-white mb-8">
-        State Categories
-      </h2>
-
       <Accordion
         type="single"
         collapsible

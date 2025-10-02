@@ -3,7 +3,7 @@ import { Facebook, Instagram } from "lucide-react";
 
 const Footer: React.FC = () => {
   return (
-    <footer className="mt-72 bg-[#1C1C1C] text-white py-4">
+    <footer className="bg-[#1C1C1C] text-white py-4">
       <div className="container mx-auto text-center">
         <nav className="mb-2">
           <Link href="/home" className="mx-2 hover:underline">
