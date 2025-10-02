@@ -111,7 +111,7 @@ export default function BlogCategory() {
     (post as any)?.post_content ?? (post as any)?.content
   );
    const goBack = () => {
-    router.push("/allBlogs");
+    router.push('/allBlogs'); // ব্রাউজারের history থেকে আগের পেজে যাবে
   };
   
   // --- Loading State (Skeleton) ---
