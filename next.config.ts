@@ -7,6 +7,19 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+   images: {
+    remotePatterns: 
+    [
+       {
+        protocol: 'https',
+        hostname: 'movingquotetexas.com',
+      },
+       {
+        protocol: 'https',
+        hostname: 'via.placeholder.com',
+      },
+    ]
+  },
   async rewrites() {
     return [
       {
