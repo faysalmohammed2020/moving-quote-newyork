@@ -2,7 +2,18 @@
 import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
 
-// Function to extract the first image's src from the post_content
+// 🔹 Title থেকে slug বানানোর helper
+const slugify = (input: string) => {
+  return (input || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")        // diacritics remove
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120);
+};
+
 // Function to extract the first image's src from the post_content (ENV-aware)
 const extractFirstImage = (htmlContent: string): string => {
   const placeholderImage = "https://via.placeholder.com/400x200";
@@ -54,7 +65,6 @@ const extractFirstImage = (htmlContent: string): string => {
 
   return src || placeholderImage;
 };
-
 
 const BlogAll = () => {
   const [blogData, setBlogData] = useState<any[]>([]);
@@ -192,46 +202,50 @@ const BlogAll = () => {
 
         {/* Blog Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
-          {currentPosts.map((blog, index) => (
-            <article
-              key={index}
-              className="group bg-gray-900 rounded-2xl overflow-hidden border border-gray-800 hover:border-gray-700 transition-all duration-300 hover:transform hover:-translate-y-2 shadow-lg hover:shadow-2xl"
-            >
-              {/* Image Container */}
-              <div className="relative overflow-hidden h-48">
-                <img
-                  src={blog.imageUrl}
-                  alt={blog.post_title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              </div>
-
-              {/* Content */}
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-white mb-3 line-clamp-2 group-hover:text-yellow-400 transition-colors duration-200">
-                  {blog.post_title}
-                </h3>
-
-                <div
-                  className="text-gray-300 text-sm mb-4 line-clamp-3 leading-relaxed"
-                  dangerouslySetInnerHTML={{
-                    __html: String(blog.post_content || "").slice(0, 150) + '...',
-                  }}
-                ></div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-gray-800">
-                  <span className="text-yellow-500 text-sm font-medium">Explore</span>
-                  <Link
-                    href={`/blogs/${blog.ID}`}
-                    className="bg-yellow-500 text-black px-5 py-2 rounded-full font-semibold text-sm hover:bg-yellow-400 transition-all duration-200 transform group-hover:scale-105 shadow-lg hover:shadow-yellow-500/25"
-                  >
-                    Read More
-                  </Link>
+          {currentPosts.map((blog, index) => {
+            const slug = slugify(blog.post_title || "");
+            return (
+              <article
+                key={index}
+                className="group bg-gray-900 rounded-2xl overflow-hidden border border-gray-800 hover:border-gray-700 transition-all duration-300 hover:transform hover:-translate-y-2 shadow-lg hover:shadow-2xl"
+              >
+                {/* Image Container */}
+                <div className="relative overflow-hidden h-48">
+                  <img
+                    src={blog.imageUrl}
+                    alt={blog.post_title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 </div>
-              </div>
-            </article>
-          ))}
+
+                {/* Content */}
+                <div className="p-6">
+                  <h3 className="text-xl font-bold text-white mb-3 line-clamp-2 group-hover:text-yellow-400 transition-colors duration-200">
+                    {blog.post_title}
+                  </h3>
+
+                  <div
+                    className="text-gray-300 text-sm mb-4 line-clamp-3 leading-relaxed"
+                    dangerouslySetInnerHTML={{
+                      __html: String(blog.post_content || "").slice(0, 150) + '...',
+                    }}
+                  ></div>
+
+                  <div className="flex items-center justify-between pt-4 border-t border-gray-800">
+                    <span className="text-yellow-500 text-sm font-medium">Explore</span>
+                    {/* 🔹 এখানে slug সহ URL */}
+                    <Link
+                      href={`/blogs/${blog.id}?slug=${encodeURIComponent(slug)}`}
+                      className="bg-yellow-500 text-black px-5 py-2 rounded-full font-semibold text-sm hover:bg-yellow-400 transition-all duration-200 transform group-hover:scale-105 shadow-lg hover:shadow-yellow-500/25"
+                    >
+                      Read More
+                    </Link> 
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
 
         {/* Enhanced Pagination */}

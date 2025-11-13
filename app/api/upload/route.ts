@@ -4,41 +4,45 @@ import path from "path";
 import fs from "fs/promises";
 import crypto from "crypto";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const uploadsRoot = path.join(process.cwd(), "public", "uploads"); // ✅ public/uploads
+
 export async function POST(req: Request) {
   try {
     const form = await req.formData();
     const file = form.get("file") as File | null;
+    if (!file) return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
 
-    if (!file) {
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
-    }
-
-    // allow-list + size limit
-    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    const allowed = ["image/jpeg","image/png","image/webp","image/gif","image/avif"];
     if (!allowed.includes(file.type)) {
       return NextResponse.json({ error: "Unsupported file type" }, { status: 415 });
     }
 
-    const bytes = await file.arrayBuffer();
-    if (bytes.byteLength > 5 * 1024 * 1024) {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    if (buf.byteLength > 5 * 1024 * 1024) {
       return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 413 });
     }
 
     const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    const hash = crypto.randomBytes(8).toString("hex");
-    const filename = `${Date.now()}-${hash}.${ext}`;
+    const name = `${Date.now()}-${crypto.randomBytes(8).toString("hex")}.${ext}`;
 
-    const dir = path.join(process.cwd(), "public", "image");
-    await fs.mkdir(dir, { recursive: true });
+    await fs.mkdir(uploadsRoot, { recursive: true });
+    const dest = path.join(uploadsRoot, name);
+    await fs.writeFile(dest, buf);
 
-    const filepath = path.join(dir, filename);
-    await fs.writeFile(filepath, Buffer.from(bytes));
+    // return the URL we also serve via the route below
+    const url = `/uploads/${name}`;
 
-    // Return relative URL for <img src="...">
-    const url = `/image/${filename}`;
-    return NextResponse.json({ url });
-  } catch (err) {
-    console.error("Upload error:", err);
+    // helpful logs
+    const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+    const proto = req.headers.get("x-forwarded-proto") || "http";
+    console.log("[upload] wrote:", dest, "url:", `${proto}://${host}${url}`);
+
+    return NextResponse.json({ url }, { status: 201 });
+  } catch (e) {
+    console.error("[upload] error:", e);
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
 }

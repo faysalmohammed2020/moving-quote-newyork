@@ -402,21 +402,8 @@ export default function BlogCategory() {
                   </button>
                 )}
                 <div
-                  className="prose prose-xl max-w-none text-slate-800
-                    prose-headings:text-slate-900 prose-headings:font-extrabold prose-h2:mt-16 prose-h3:mt-10
-                    prose-a:text-cyan-600 prose-a:font-medium hover:prose-a:text-cyan-700
-                    prose-img:rounded-xl prose-img:shadow-lg prose-img:border prose-img:border-slate-200 prose-img:mt-8 prose-img:mb-12
-                    prose-hr:my-16 prose-hr:border-slate-200
-                    prose-blockquote:border-l-4 prose-blockquote:border-cyan-500 prose-blockquote:bg-cyan-50/70 prose-blockquote:py-4 prose-blockquote:px-6 prose-blockquote:rounded-r-lg prose-blockquote:text-slate-700
-                    [&_table]:w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:my-10 [&_table]:shadow-md [&_table]:rounded-lg [&_table]:overflow-hidden
-                    [&_thead]:bg-cyan-600 [&_thead]:text-white
-                    [&_th]:px-4 [&_td]:px-4 [&_th]:py-3 [&_td]:py-3 [&_td]:align-top
-                    [&_th]:text-left [&_th]:font-semibold 
-                    [&_tr]:border-b [&_tr]:border-gray-200
-                    [&_tbody_tr:nth-child(even)]:bg-gray-50
-                    [&_tbody_tr:hover]:bg-cyan-50
-                    [&_td]:text-center"
-                  dangerouslySetInnerHTML={{ __html: html }}
+                  className="blog-content mt-2 max-w-none text-slate-800 overflow-x-auto"
+                  dangerouslySetInnerHTML={{ __html: post.post_content }}
                   itemProp="articleBody"
                 />
               </div>
