@@ -1,8 +1,15 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import { FaBlog, FaFileAlt, FaComments, FaHeart, FaCalendarAlt, FaChartLine } from "react-icons/fa";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  FaBlog,
+  FaFileAlt,
+  FaComments,
+  FaHeart,
+  FaCalendarAlt,
+  FaChartLine,
+} from "react-icons/fa";
 import { IoIosAddCircle } from "react-icons/io";
-import BlogPostForm from "@/components/blogForm";
+import dynamic from "next/dynamic";
 import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import {
@@ -17,6 +24,15 @@ import {
   Line,
 } from "recharts";
 import axios from "axios";
+
+// 🔹 Blog form lazy-load (modal খুললে তবেই লোড হবে)
+const BlogPostForm = dynamic(() => import("@/components/blogForm"), {
+  loading: () => (
+    <div className="py-10 text-center text-sm text-gray-500">
+      Loading editor…
+    </div>
+  ),
+});
 
 type Blog = {
   id: number;
@@ -35,7 +51,10 @@ const Dashboard = () => {
   const { data: session } = useSession();
   const router = useRouter();
 
-  const [stats, setStats] = useState({ dailyLeads: [] as any[], dailyResponses: [] as any[] });
+  const [stats, setStats] = useState({
+    dailyLeads: [] as any[],
+    dailyResponses: [] as any[],
+  });
   const [totalLeads, setTotalLeads] = useState(0);
   const [totalResponses, setTotalResponses] = useState(0);
   const [submissions, setSubmissions] = useState<any[]>([]);
@@ -47,6 +66,7 @@ const Dashboard = () => {
   const [blogsLoading, setBlogsLoading] = useState<boolean>(false);
   const [blogsError, setBlogsError] = useState<string | null>(null);
 
+  // ---------- Dashboard data ----------
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -59,8 +79,8 @@ const Dashboard = () => {
 
         const statsData = await statsRes.json();
         setStats({
-          dailyLeads: statsData.dailyLeads,
-          dailyResponses: statsData.dailyResponses,
+          dailyLeads: statsData.dailyLeads ?? [],
+          dailyResponses: statsData.dailyResponses ?? [],
         });
         setTotalLeads(statsData.totalLeads ?? 0);
         setTotalResponses(statsData.totalResponses ?? 0);
@@ -76,7 +96,7 @@ const Dashboard = () => {
     fetchDashboardData();
   }, []);
 
-  // ✅ Fetch blogs from API: /api/blogs
+  // ---------- Blogs ----------
   const loadBlogs = async () => {
     try {
       setBlogsLoading(true);
@@ -106,14 +126,35 @@ const Dashboard = () => {
     if (shouldReload) loadBlogs();
   };
 
+  // ---------- Memoized derived data ----------
+  const chartData = useMemo(
+    () =>
+      stats.dailyLeads.map((lead: any, index: number) => ({
+        date: lead.date,
+        leads: lead.count,
+        responses: stats.dailyResponses[index]?.count || 0,
+      })),
+    [stats.dailyLeads, stats.dailyResponses]
+  );
+
+  const recentSubmissions = useMemo(
+    () => submissions.slice(0, 5),
+    [submissions]
+  );
+  const recentResponses = useMemo(() => responses.slice(0, 5), [responses]);
+  const recentBlogs = useMemo(() => blogs.slice(0, 5), [blogs]);
+
   return (
     <div className="bg-gray-50 min-h-screen w-full p-6">
       {/* Header Section */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Admin Dashboard</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+            Admin Dashboard
+          </h1>
           <p className="text-gray-500 mt-1 text-sm">
-            Welcome back, {session?.user?.name || "Admin"}! Here's what's happening today.
+            Welcome back, {session?.user?.name || "Admin"}! Here's what's
+            happening today.
           </p>
         </div>
         <div className="flex items-center space-x-4 mt-4 md:mt-0">
@@ -133,10 +174,11 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         <StatCard
           title="Total Blogs"
-          value={blogsLoading ? "…" : blogs.length}
+          value={blogs.length}
           icon={<FaBlog className="text-blue-500 text-xl" />}
           color="bg-blue-100"
           textColor="text-blue-600"
+          loading={blogsLoading}
         />
         <StatCard
           title="Total Submissions"
@@ -144,6 +186,7 @@ const Dashboard = () => {
           icon={<FaFileAlt className="text-green-500 text-xl" />}
           color="bg-green-100"
           textColor="text-green-600"
+          loading={isLoading}
         />
         <StatCard
           title="Total Responses"
@@ -151,6 +194,7 @@ const Dashboard = () => {
           icon={<FaComments className="text-purple-500 text-xl" />}
           color="bg-purple-100"
           textColor="text-purple-600"
+          loading={isLoading}
         />
         <StatCard
           title="Engagement Rate"
@@ -158,6 +202,7 @@ const Dashboard = () => {
           icon={<FaHeart className="text-red-500 text-xl" />}
           color="bg-red-100"
           textColor="text-red-600"
+          loading={isLoading}
         />
       </div>
 
@@ -175,52 +220,101 @@ const Dashboard = () => {
           </select>
         </div>
         <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart
-              data={stats.dailyLeads.map((lead: any, index: number) => ({
-                date: lead.date,
-                leads: lead.count,
-                responses: stats.dailyResponses[index]?.count || 0,
-              }))}
-              margin={{ top: 10, right: 10, left: 0, bottom: 10 }}
-            >
-              <defs>
-                <linearGradient id="leadGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.9} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0.1} />
-                </linearGradient>
-                <linearGradient id="responseGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#16a34a" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#16a34a" stopOpacity={0.1} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-              <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#fff",
-                  border: "none",
-                  borderRadius: "8px",
-                  boxShadow:
-                    "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
-                }}
-                labelStyle={{ color: "#374151", fontWeight: "bold", fontSize: "14px" }}
-                itemStyle={{ fontSize: "14px", color: "#4b5563" }}
-              />
-              <Legend verticalAlign="top" height={36} iconType="circle" iconSize={10} wrapperStyle={{ fontSize: "12px", paddingBottom: "20px" }} />
-              <Bar dataKey="leads" fill="url(#leadGradient)" radius={[4, 4, 0, 0]} name="Submissions" barSize={24} />
-              <Line
-                type="monotone"
-                dataKey="responses"
-                stroke="#16a34a"
-                strokeWidth={2}
-                dot={{ r: 4, strokeWidth: 2, fill: "#16a34a" }}
-                activeDot={{ r: 6, fill: "#16a34a" }}
-                name="Responses"
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
+          {isLoading ? (
+            <ChartSkeleton />
+          ) : chartData.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+              No data available.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={chartData}
+                margin={{ top: 10, right: 10, left: 0, bottom: 10 }}
+              >
+                <defs>
+                  <linearGradient
+                    id="leadGradient"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.9} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.1} />
+                  </linearGradient>
+                  <linearGradient
+                    id="responseGradient"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop offset="5%" stopColor="#16a34a" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#16a34a" stopOpacity={0.1} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="#f3f4f6"
+                />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 12, fill: "#6b7280" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fontSize: 12, fill: "#6b7280" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#fff",
+                    border: "none",
+                    borderRadius: "8px",
+                    boxShadow:
+                      "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+                  }}
+                  labelStyle={{
+                    color: "#374151",
+                    fontWeight: "bold",
+                    fontSize: "14px",
+                  }}
+                  itemStyle={{ fontSize: "14px", color: "#4b5563" }}
+                />
+                <Legend
+                  verticalAlign="top"
+                  height={36}
+                  iconType="circle"
+                  iconSize={10}
+                  wrapperStyle={{
+                    fontSize: "12px",
+                    paddingBottom: "20px",
+                  }}
+                />
+                <Bar
+                  dataKey="leads"
+                  fill="url(#leadGradient)"
+                  radius={[4, 4, 0, 0]}
+                  name="Submissions"
+                  barSize={24}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="responses"
+                  stroke="#16a34a"
+                  strokeWidth={2}
+                  dot={{ r: 4, strokeWidth: 2, fill: "#16a34a" }}
+                  activeDot={{ r: 6, fill: "#16a34a" }}
+                  name="Responses"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
@@ -228,43 +322,56 @@ const Dashboard = () => {
         {/* Submissions Table */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-800">Recent Lead Submissions</h2>
+            <h2 className="text-lg font-semibold text-gray-800">
+              Recent Lead Submissions
+            </h2>
             <span className="bg-gray-100 text-gray-600 text-xs font-medium px-2.5 py-0.5 rounded-full">
               {submissions.length} Total
             </span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="text-xs font-semibold text-gray-500 bg-gray-50 uppercase tracking-wider">
-                  <th className="px-6 py-3 text-left">Name</th>
-                  <th className="px-6 py-3 text-left">Email</th>
-                  <th className="px-6 py-3 text-left">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {submissions.slice(0, 5).map((lead: any) => (
-                  <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">
-                        {lead.firstName} {lead.lastName}
-                      </div>
-                      <div className="text-xs text-gray-500">{lead.phone || "—"}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{lead.email || "—"}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-xs text-gray-500">
-                        {new Date(lead.createdAt).toLocaleDateString()}
-                      </div>
-                    </td>
+            {isLoading ? (
+              <TableSkeleton rows={5} />
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="text-xs font-semibold text-gray-500 bg-gray-50 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left">Name</th>
+                    <th className="px-6 py-3 text-left">Email</th>
+                    <th className="px-6 py-3 text-left">Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {recentSubmissions.map((lead: any) => (
+                    <tr
+                      key={lead.id}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-medium text-gray-900">
+                          {lead.firstName} {lead.lastName}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {lead.phone || "—"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {lead.email || "—"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-xs text-gray-500">
+                          {new Date(lead.createdAt).toLocaleDateString()}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
-          {submissions.length > 5 && (
+          {!isLoading && submissions.length > 5 && (
             <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 text-center">
               <button className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
                 View all submissions
@@ -276,41 +383,58 @@ const Dashboard = () => {
         {/* Responses Table */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-800">Leads with Responses</h2>
+            <h2 className="text-lg font-semibold text-gray-800">
+              Leads with Responses
+            </h2>
             <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
               {responses.length} Total
             </span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="text-xs font-semibold text-gray-500 bg-gray-50 uppercase tracking-wider">
-                  <th className="px-6 py-3 text-left">Lead ID</th>
-                  <th className="px-6 py-3 text-left">Contact</th>
-                  <th className="px-6 py-3 text-left">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {responses.slice(0, 5).map((leadId: any, index: number) => (
-                  <tr key={index} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">{leadId}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{leadId.email || "—"}</div>
-                      <div className="text-xs text-gray-500">{leadId.phone || "—"}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-xs text-gray-500">
-                        {leadId?.date ? new Date(leadId.date).toLocaleDateString() : "—"}
-                      </div>
-                    </td>
+            {isLoading ? (
+              <TableSkeleton rows={5} />
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="text-xs font-semibold text-gray-500 bg-gray-50 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left">Lead ID</th>
+                    <th className="px-6 py-3 text-left">Contact</th>
+                    <th className="px-6 py-3 text-left">Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {recentResponses.map((leadId: any, index: number) => (
+                    <tr
+                      key={index}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-medium text-gray-900">
+                          {leadId}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {leadId.email || "—"}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {leadId.phone || "—"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-xs text-gray-500">
+                          {leadId?.date
+                            ? new Date(leadId.date).toLocaleDateString()
+                            : "—"}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
-          {responses.length > 5 && (
+          {!isLoading && responses.length > 5 && (
             <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 text-center">
               <button className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
                 View all responses
@@ -323,7 +447,9 @@ const Dashboard = () => {
       {/* Recent Blogs Section */}
       <div className="bg-white rounded-xl shadow-sm p-6 mt-8">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-semibold text-gray-800">Recent Blog Posts</h2>
+          <h2 className="text-lg font-semibold text-gray-800">
+            Recent Blog Posts
+          </h2>
           <button
             onClick={() => openForm()}
             className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center"
@@ -354,13 +480,22 @@ const Dashboard = () => {
                 onClick={() => closeForm(false)}
                 className="text-gray-400 hover:text-gray-600 transition"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
             <div className="p-6">
-              {/* Pass closeForm so the form can call closeForm(true) after successful submit to refetch */}
               <BlogPostForm blog={selectedBlog as any} closeForm={closeForm} />
             </div>
           </div>
@@ -370,23 +505,56 @@ const Dashboard = () => {
   );
 };
 
-const StatCard = ({ title, value, icon, color, textColor }: any) => (
+// ---------- Components ----------
+
+const StatCard = ({
+  title,
+  value,
+  icon,
+  color,
+  textColor,
+  loading,
+}: any) => (
   <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
     <div className="flex items-center">
       <div className={`p-3 rounded-lg ${color} ${textColor}`}>{icon}</div>
       <div className="ml-4">
         <h4 className="text-sm font-medium text-gray-500">{title}</h4>
-        <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
+        {loading ? (
+          <div className="mt-2 h-6 w-16 bg-gray-200 rounded animate-pulse" />
+        ) : (
+          <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
+        )}
       </div>
     </div>
   </div>
 );
 
-const BlogList = ({ openForm, blogs, loading }: { openForm: (b?: Blog | null) => void; blogs: Blog[]; loading: boolean }) => {
+const BlogList = ({
+  openForm,
+  blogs,
+  loading,
+}: {
+  openForm: (b?: Blog | null) => void;
+  blogs: Blog[];
+  loading: boolean;
+}) => {
   const recent = blogs?.slice(0, 5) ?? [];
 
   if (loading) {
-    return <div className="text-sm text-gray-500">Loading blogs…</div>;
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            className="py-4 px-2 rounded-md bg-gray-50 animate-pulse"
+          >
+            <div className="h-4 w-40 bg-gray-200 rounded mb-2" />
+            <div className="h-3 w-24 bg-gray-200 rounded" />
+          </div>
+        ))}
+      </div>
+    );
   }
 
   if (!recent.length) {
@@ -408,12 +576,64 @@ const BlogList = ({ openForm, blogs, loading }: { openForm: (b?: Blog | null) =>
             </p>
           </div>
           <span className="text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-600">
-            {new Date(blog.post_date || blog.createdAt || "").toLocaleDateString()}
+            {new Date(
+              blog.post_date || blog.createdAt || ""
+            ).toLocaleDateString()}
           </span>
         </div>
       ))}
     </div>
   );
 };
+
+const TableSkeleton = ({ rows = 5 }: { rows?: number }) => (
+  <table className="w-full">
+    <thead>
+      <tr className="text-xs font-semibold text-gray-500 bg-gray-50 uppercase tracking-wider">
+        <th className="px-6 py-3 text-left">Name</th>
+        <th className="px-6 py-3 text-left">Email</th>
+        <th className="px-6 py-3 text-left">Date</th>
+      </tr>
+    </thead>
+    <tbody className="divide-y divide-gray-100">
+      {Array.from({ length: rows }).map((_, i) => (
+        <tr key={i}>
+          <td className="px-6 py-4">
+            <div className="h-4 w-32 bg-gray-200 rounded mb-2 animate-pulse" />
+            <div className="h-3 w-20 bg-gray-200 rounded animate-pulse" />
+          </td>
+          <td className="px-6 py-4">
+            <div className="h-4 w-40 bg-gray-200 rounded animate-pulse" />
+          </td>
+          <td className="px-6 py-4">
+            <div className="h-3 w-24 bg-gray-200 rounded animate-pulse" />
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
+
+const ChartSkeleton = () => (
+  <div className="h-full flex flex-col justify-between">
+    <div className="flex justify-between px-4 mb-4">
+      <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+      <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
+    </div>
+    <div className="flex-1 px-4 flex items-end gap-2">
+      {Array.from({ length: 10 }).map((_, i) => (
+        <div
+          key={i}
+          className="flex-1 flex flex-col justify-end items-center"
+        >
+          <div
+            className="w-full bg-gray-200 rounded-t animate-pulse"
+            style={{ height: `${30 + (i % 5) * 10}%` }}
+          />
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 export default Dashboard;
