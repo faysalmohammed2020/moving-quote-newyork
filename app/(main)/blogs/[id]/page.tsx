@@ -1,44 +1,26 @@
 "use client";
 
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import Head from "next/head";
 import { useEffect, useMemo, useState } from "react";
-import Head from "next/head"; // SEO meta (client-only fallback)
-import { useRouter, useParams } from "next/navigation";
-import { CalendarIcon, TagIcon, ChevronLeft } from "lucide-react";
 import { useSession, signIn } from "next-auth/react";
-import Categories from "@/components/Categories";
-import RichTextEditor from "@/components/RichTextEditor";
-import { postdata } from "@/app/(main)/data/postdata";
+import BlogPostForm from "@/components/BlogPostForm";
 
-const API_URL = "/api/blogs";
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.example.com";
-
-/* -------------------- Helpers -------------------- */
-type DbPost = {
+/** Types */
+interface Blog {
+  post_content: string;
+  createdAt: string | number | Date;
   id: number;
   post_title: string;
-  post_content: string;
-  category?: string | null;
-  tags?: string | string[] | null;
-  post_status?: string | null;
-  createdAt?: string | null;
-  post_date?: string | null;
-  cover_image?: string | null;
-};
+  category?: string;
+  tags?: string[] | string;
+  post_status?: "draft" | "publish" | "private" | string;
+}
 
-function escapeHtml(s: string) {
-  return s.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]!));
-}
-function contentToHtml(v: any): string {
-  if (!v) return "";
-  if (typeof v === "string") return v;
-  try {
-    return `<pre style="white-space:pre-wrap; background:#f4f4f5; padding:1rem; border-radius:0.5rem; overflow-x:auto;">${escapeHtml(
-      JSON.stringify(v, null, 2)
-    )}</pre>`;
-  } catch {
-    return "";
-  }
-}
+/* ---------- helpers ---------- */
+const SITE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://www.example.com";
+
 function stripHtml(html: string): string {
   if (!html) return "";
   return html
@@ -49,188 +31,243 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-/* -------------------- Component -------------------- */
-export default function BlogCategory() {
-  const params = useParams() as { id?: string };
-  const numericId = useMemo(() => Number(params?.id), [params?.id]);
+function slugify(input: string) {
+  return (input || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120);
+}
 
-  const { status } = useSession();
+export default function BlogPost() {
+  const { id } = useParams<{ id: string }>();
+  const postId = Number(id);
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlSlug = searchParams.get("slug") || "";
+
+  const { data: session, status } = useSession();
   const isAuthed = status === "authenticated";
 
-  const [post, setPost] = useState<DbPost | null>(null);
+  const [post, setPost] = useState<Blog | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // EDIT MODAL
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState<{
+  // === unified modal state ===
+  const [isFormVisible, setIsFormVisible] = useState(false);
+  const [editBlogData, setEditBlogData] = useState<{
     id?: number;
     post_title: string;
     post_content: string;
-    category: string;
-    tags: string;
+    category?: string;
+    tags?: string[] | string;
     post_status?: "draft" | "publish" | "private" | string;
-  }>({ post_title: "", post_content: "", category: "", tags: "" });
+  } | null>(null);
 
-  const router = useRouter();
-
+  /** ✅ Fetch only the single post by id (FAST + FIXED) */
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const localFallback = (postdata as any[]).find((b) => Number(b.ID) === numericId);
+    if (!postId || Number.isNaN(postId)) {
+      setLoading(false);
+      return;
+    }
 
-      if (!numericId || Number.isNaN(numericId)) {
-        if (mounted) setLoading(false);
-        return;
-      }
+    const controller = new AbortController();
 
-      let fetchedPost: any = null;
+    const fetchPost = async () => {
+      setLoading(true);
       try {
-        const res = await fetch(`${API_URL}?id=${numericId}`, { cache: "no-store" });
-        if (res.ok) fetchedPost = await res.json();
-      } catch {}
-      finally {
-        if (!mounted) return;
-        const normalized: DbPost | null =
-          fetchedPost ??
-          (localFallback
-            ? {
-                id: Number(localFallback.ID),
-                post_title: localFallback.post_title || localFallback.title || "Untitled Post",
-                post_content: String(localFallback.post_content ?? localFallback.content ?? ""),
-                category: localFallback.category ?? "",
-                tags: Array.isArray(localFallback.tags) ? localFallback.tags.join(",") : (localFallback.tags ?? ""),
-                post_status: localFallback.post_status ?? "draft",
-                createdAt:
-                  localFallback.createdAt ??
-                  localFallback.post_date ??
-                  localFallback.postDate ??
-                  new Date().toISOString(),
-                post_date: localFallback.post_date ?? null,
-                cover_image: localFallback.cover_image ?? null,
-              }
-            : null);
-        setPost(normalized);
+        const res = await fetch(`/api/blogs?id=${postId}`, {
+          signal: controller.signal,
+        });
+
+        if (!res.ok) throw new Error("Failed to fetch blog data");
+        const data = await res.json();
+
+        const transformed: Blog = {
+          id: data.id,
+          post_title: data.post_title,
+          post_content:
+            typeof data.post_content === "object" && data.post_content?.text
+              ? data.post_content.text
+              : String(data.post_content ?? ""),
+          createdAt: data.createdAt,
+          category: data.category ?? "",
+          tags: data.tags ?? [],
+          post_status: data.post_status ?? "draft",
+        };
+
+        setPost(transformed);
+      } catch (e) {
+        if ((e as any).name !== "AbortError") console.error(e);
+      } finally {
         setLoading(false);
       }
-    })();
-    return () => {
-      mounted = false;
     };
-  }, [numericId]);
 
-  // Normalized fields for SEO
-  const title = (post as any)?.post_title ?? (post as any)?.title ?? "Untitled Post";
-  const dateStr =
-    (post as any)?.createdAt || (post as any)?.post_date || (post as any)?.postDate || new Date().toISOString();
-  const category = (post as any)?.category ?? "";
-  const tagsStr = Array.isArray((post as any)?.tags)
-    ? ((post as any)?.tags as string[]).join(",")
-    : ((post as any)?.tags as string) ?? "";
-  const tags = tagsStr ? tagsStr.split(",").map((t: string) => t.trim()) : [];
-  const html = contentToHtml((post as any)?.post_content ?? (post as any)?.content);
+    fetchPost();
+    return () => controller.abort();
+  }, [postId]);
 
-  // SEO meta (client fallback): description/canonical/og/twitter
-  const description = stripHtml((post as any)?.post_content ?? (post as any)?.content ?? "").slice(0, 160) ||
-    "Read this article on Birds Of Eden Blog.";
-  const isPublished =
-    String((post?.post_status ?? "draft")).toLowerCase() === "publish" ||
-    String((post?.post_status ?? "draft")).toLowerCase() === "published";
-  const canonicalPath = `/blogs/${numericId || ""}`;
-  const canonicalUrl = `${SITE_URL}${canonicalPath}`;
+  // ✅ ensure URL has ?slug=<slug-from-title>
+  useEffect(() => {
+    if (!post) return;
+    const desired = slugify(post.post_title || "");
+    if (!desired) return;
 
-  // JSON-LD Article
-  const articleJsonLd = post
-    ? {
-        "@context": "https://schema.org",
-        "@type": "Article",
-        headline: title,
-        description,
-        datePublished: new Date(dateStr).toISOString(),
-        dateModified: new Date(dateStr).toISOString(),
-        author: [{ "@type": "Organization", name: "Moving Quote New York" }],
-        publisher: {
-          "@type": "Organization",
-          name: "Moving Quote New York",
-          logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png` },
-        },
-        mainEntityOfPage: canonicalUrl,
-        image: post.cover_image ? [post.cover_image] : undefined,
-        articleSection: category || undefined,
-        keywords: tags.length ? tags.join(", ") : undefined,
-      }
-    : null;
+    if (urlSlug !== desired) {
+      const qs = new URLSearchParams(Array.from(searchParams.entries()));
+      qs.set("slug", desired);
+      router.replace(`/blogs/${postId}?${qs.toString()}`, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postId, post?.post_title]);
 
-  const goBack = () => router.push("/allBlogs");
+  const readTime = useMemo(() => {
+    if (!post?.post_content) return 1;
+    const words =
+      post.post_content
+        .replace(/<[^>]+>/g, " ")
+        .trim()
+        .split(/\s+/).length || 1;
+    return Math.max(1, Math.ceil(words / 200));
+  }, [post?.post_content]);
 
-  // Edit modal open
-  const openEdit = () => {
+  /** Open Edit */
+  const openEdit = (focus: "title" | "content") => {
     if (!isAuthed) return signIn();
     if (!post) return;
-    setEditForm({
+
+    setEditBlogData({
       id: post.id,
       post_title: post.post_title || "",
       post_content: post.post_content || "",
-      category: (post.category as string) || "",
-      tags: typeof post.tags === "string" ? post.tags : ((post.tags || []) as string[]).join(","),
+      category: post.category || "",
+      tags: post.tags ?? "",
       post_status: (post.post_status as any) || "draft",
     });
-    setIsEditOpen(true);
+    setIsFormVisible(true);
   };
-  const closeEdit = () => setIsEditOpen(false);
 
-  // Update
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  /** Close modal */
+  const handleCloseModal = () => {
+    setIsFormVisible(false);
+    setEditBlogData(null);
+  };
+
+  /** Update (PUT) */
+  const handleUpdateBlog = async (payload: {
+    id?: number;
+    post_title: string;
+    post_content: string;
+    category?: string;
+    tags?: string[] | string;
+    post_status?: "draft" | "publish" | "private" | string;
+  }) => {
     try {
       const res = await fetch("/api/blogs", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: editForm.id ?? post?.id,
-          post_title: editForm.post_title,
-          post_content: editForm.post_content,
-          category: editForm.category,
-          tags: editForm.tags,
-          post_status: editForm.post_status ?? "draft",
+          id: payload.id ?? post?.id,
+          post_title: payload.post_title,
+          post_content: payload.post_content,
+          category: payload.category ?? "",
+          tags: payload.tags,
+          post_status: payload.post_status ?? "draft",
         }),
       });
+
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err?.error || "Failed to update");
       }
-      const updated: DbPost = await res.json();
+
+      const updated: Blog = await res.json();
       setPost((prev) => (prev ? { ...prev, ...updated } : updated));
-      setIsEditOpen(false);
-    } catch (err) {
-      alert((err as Error).message || "Update failed");
-      console.error(err);
+      handleCloseModal();
+    } catch (e) {
+      alert((e as Error).message || "Update failed");
+      console.error(e);
     }
   };
 
-  /* -------------------- Loading/Not Found -------------------- */
-  if (loading || status === "loading") {
+  /* ---------- SEO ---------- */
+  const title = post?.post_title ?? "Untitled Post";
+  const description =
+    stripHtml(post?.post_content ?? "").slice(0, 160) ||
+    "Read this article on Moving Quote New York Blog.";
+  const effectiveSlug = slugify(title);
+  const canonical = `${SITE_URL}/blogs/${postId}${
+    effectiveSlug ? `?slug=${encodeURIComponent(effectiveSlug)}` : ""
+  }`;
+
+  const isPublished =
+    String(post?.post_status ?? "draft").toLowerCase() === "publish" ||
+    String(post?.post_status ?? "draft").toLowerCase() === "published";
+
+  const keywords =
+    (Array.isArray(post?.tags)
+      ? post?.tags
+      : String(post?.tags || "").split(","))
+      .map((t) => String(t).trim())
+      .filter(Boolean)
+      .join(", ") || undefined;
+
+  const dateISO = post?.createdAt
+    ? new Date(post.createdAt).toISOString()
+    : new Date().toISOString();
+
+  const jsonLd = post && {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: title,
+    description,
+    datePublished: dateISO,
+    dateModified: dateISO,
+    author: [{ "@type": "Organization", name: "Moving Quote New York" }],
+    publisher: {
+      "@type": "Organization",
+      name: "Moving Quote New York",
+      logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png` },
+    },
+    mainEntityOfPage: canonical,
+    articleSection: post?.category || undefined,
+    keywords,
+  };
+
+  /** ✅ Skeleton loader (same layout vibe) */
+  if (loading) {
     return (
       <>
         <Head>
-          <title>Loading… | Birds Of Eden Blog</title>
+          <title>Loading… | Moving Quote New York Blog</title>
           <meta name="robots" content="noindex,nofollow" />
+          <link rel="canonical" href={canonical} />
         </Head>
-        <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto">
-            <div className="bg-white rounded-2xl shadow-xl p-8 sm:p-12">
-              <div className="h-10 w-4/5 bg-gray-200 rounded-lg mb-6 animate-pulse" />
-              <div className="flex space-x-6 mb-12">
-                <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
-                <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
-              </div>
-              <div className="space-y-4">
-                <div className="h-4 w-full bg-gray-200 rounded animate-pulse" />
-                <div className="h-4 w-11/12 bg-gray-200 rounded animate-pulse" />
-                <div className="h-4 w-10/12 bg-gray-200 rounded animate-pulse" />
-                <div className="h-4 w-full bg-gray-200 rounded animate-pulse" />
-                <div className="h-4 w-9/12 bg-gray-200 rounded animate-pulse" />
+
+        <div className="min-h-screen bg-white">
+          <div className="mx-auto max-w-7xl px-6 pt-16 pb-24 grid grid-cols-1 lg:grid-cols-12 lg:gap-12 animate-pulse">
+            <div className="lg:col-span-8 space-y-6">
+              <div className="h-10 w-3/4 bg-slate-200 rounded" />
+              <div className="h-6 w-1/3 bg-slate-200 rounded" />
+              <div className="space-y-3">
+                <div className="h-4 w-full bg-slate-200 rounded" />
+                <div className="h-4 w-11/12 bg-slate-200 rounded" />
+                <div className="h-4 w-10/12 bg-slate-200 rounded" />
+                <div className="h-4 w-9/12 bg-slate-200 rounded" />
               </div>
             </div>
+
+            <aside className="lg:col-span-4 mt-10 lg:mt-0">
+              <div className="p-6 border border-slate-100 rounded-xl bg-slate-50 shadow-md space-y-4">
+                <div className="h-4 w-1/2 bg-slate-200 rounded" />
+                <div className="h-10 w-full bg-slate-200 rounded" />
+                <div className="h-10 w-full bg-slate-200 rounded" />
+              </div>
+            </aside>
           </div>
         </div>
       </>
@@ -243,265 +280,243 @@ export default function BlogCategory() {
         <Head>
           <title>Not Found | Moving Quote New York Blog</title>
           <meta name="robots" content="noindex,nofollow" />
-          <link rel="canonical" href={`${SITE_URL}/blogs/${numericId || ""}`} />
+          <link rel="canonical" href={canonical} />
         </Head>
-        <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
-          <div className="text-center bg-white p-10 rounded-xl shadow-lg">
-            <h2 className="text-4xl font-extrabold text-gray-800 mb-4">Post Not Found 🧐</h2>
-            <p className="text-xl text-gray-500">It looks like the article you're searching for doesn't exist.</p>
-            <button
-              onClick={goBack}
-              className="mt-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-full shadow-sm text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 transition duration-150 ease-in-out"
+        <div className="min-h-screen grid place-items-center bg-slate-50">
+          <div className="text-center p-10 bg-white rounded-xl shadow-2xl">
+            <div className="mx-auto mb-6 h-20 w-20 rounded-full bg-cyan-100 shadow-inner flex items-center justify-center">
+              <span className="text-4xl">🤷‍♂️</span>
+            </div>
+            <h2 className="text-3xl font-extrabold text-slate-900">
+              Content Missing
+            </h2>
+            <p className="mt-2 text-lg text-slate-600">
+              The requested article could not be located.
+            </p>
+            <Link
+              href="/allBlogs"
+              className="mt-8 inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-6 py-3 text-lg font-semibold text-white shadow-lg shadow-cyan-500/30 hover:bg-cyan-700 transition"
             >
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              Go Back
-            </button>
+              <span className="text-xl">←</span> Return to Blog Home
+            </Link>
           </div>
         </div>
       </>
     );
   }
 
-  /* -------------------- Page -------------------- */
   return (
     <>
-      {/* SEO head (client fallback). For best SEO use server-side Metadata, but keeping it within this file as requested. */}
       <Head>
         <title>{`${title} | Moving Quote New York Blog`}</title>
         <meta name="description" content={description} />
-        <link rel="canonical" href={canonicalUrl} />
+        {keywords && <meta name="keywords" content={keywords} />}
+        <link rel="canonical" href={canonical} />
         <meta
           name="robots"
-          content={isPublished ? "index,follow" : "noindex,nofollow,noimageindex,nocache"}
+          content={
+            isPublished
+              ? "index,follow"
+              : "noindex,nofollow,noimageindex,nocache"
+          }
         />
-
-        {/* Open Graph */}
         <meta property="og:type" content="article" />
+        <meta property="og:site_name" content="Moving Quote New York Blog" />
         <meta property="og:title" content={title} />
         <meta property="og:description" content={description} />
-        <meta property="og:url" content={canonicalUrl} />
-        {post.cover_image && <meta property="og:image" content={post.cover_image} />}
-
-        {/* Twitter */}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={title} />
+        <meta property="og:url" content={canonical} />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content={`${title} | Moving Quote New York Blog`} />
         <meta name="twitter:description" content={description} />
-        {post.cover_image && <meta name="twitter:image" content={post.cover_image} />}
-
-        {/* JSON-LD */}
-        {articleJsonLd && (
-          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
+        {jsonLd && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          />
         )}
       </Head>
 
-      <main className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8 font-['Inter',_sans-serif]">
-        {/* Breadcrumb (semantic) */}
-        <nav aria-label="Breadcrumb" className="max-w-4xl mx-auto mb-4">
-          <ol className="flex items-center space-x-2 text-sm text-slate-600">
-            <li><a href="/" className="hover:text-cyan-700">Home</a></li>
-            <li aria-hidden="true">/</li>
-            <li><a href="/allBlogs" className="hover:text-cyan-700">Blog</a></li>
-            <li aria-hidden="true">/</li>
-            <li aria-current="page" className="text-slate-900 font-medium">{title}</li>
-          </ol>
-        </nav>
+      {/* ---- rest of your UI unchanged ---- */}
+      <div className="min-h-screen bg-white relative">
+        {/* Header */}
+        <header className="py-8 border-b border-slate-100 shadow-sm" role="banner">
+          <div className="mx-auto max-w-7xl px-6">
+            <nav aria-label="Breadcrumb">
+              <ol className="flex items-center gap-2 text-slate-500 text-sm">
+                <li>
+                  <Link href="/" className="hover:text-cyan-600">Home</Link>
+                </li>
+                <li aria-hidden="true">/</li>
+                <li>
+                  <Link href="/allBlogs" className="hover:text-cyan-600">Blog</Link>
+                </li>
+                <li aria-hidden="true">/</li>
+                <li aria-current="page" className="text-slate-800 font-medium">
+                  {title}
+                </li>
+              </ol>
+            </nav>
+          </div>
+        </header>
 
-        <div className="max-w-4xl mx-auto">
-          <button
-            onClick={goBack}
-            className="mb-6 inline-flex items-center text-sm font-medium text-gray-600 hover:text-cyan-600 transition duration-150 ease-in-out"
-          >
-            <ChevronLeft className="w-4 h-4 mr-1" />
-            Back to Blog
-          </button>
+        {/* Content + Sidebar */}
+        <main
+          className="mx-auto max-w-7xl px-6 pt-16 pb-24 grid grid-cols-1 lg:grid-cols-12 lg:gap-12"
+          itemScope
+          itemType="https://schema.org/Article"
+        >
+          <article className="lg:col-span-8">
+            <div className="max-w-4xl space-y-8">
+              {/* Title */}
+              <div className="relative group">
+                <h1
+                  className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 leading-snug"
+                  itemProp="headline"
+                >
+                  {post.post_title}
+                </h1>
 
-          {/* Article with Schema.org microdata */}
-          <article
-            itemScope
-            itemType="https://schema.org/Article"
-            className="relative group bg-white rounded-2xl shadow-xl transition-all duration-300 border border-gray-100"
-          >
-            {/* Edit button (auth only) */}
-            {isAuthed && (
-              <button
-                onClick={openEdit}
-                title="Edit this post"
-                className="absolute right-4 top-4 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 hover:border-cyan-300 hover:text-cyan-700"
-              >
-                ✏️ Edit
-              </button>
-            )}
-
-            {/* Optional cover image (good for LCP with proper alt) */}
-            {post.cover_image && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={post.cover_image}
-                alt={title}
-                width={1200}
-                height={630}
-                loading="eager"
-                fetchPriority="high"
-                className="w-full h-auto rounded-t-2xl"
-                itemProp="image"
-              />
-            )}
-
-            <div className="p-8 sm:p-12">
-              {category && (
-                <p className="text-sm font-semibold uppercase text-cyan-600 tracking-wider mb-2" itemProp="articleSection">
-                  {category}
-                </p>
-              )}
-
-              <h1 className="text-slate-900 text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight mb-6 break-words" itemProp="headline">
-                {title}
-              </h1>
-
-              <div className="flex flex-wrap items-center text-sm text-gray-500 mb-10 border-b border-gray-200 pb-4">
-                <span className="flex items-center mr-6 mb-2 sm:mb-0">
-                  <CalendarIcon className="w-4 h-4 mr-2 text-cyan-600" />
-                  <time dateTime={new Date(dateStr).toISOString()} itemProp="datePublished">
-                    {new Date(dateStr).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </time>
-                </span>
-                {tags.length > 0 && (
-                  <span className="flex items-center">
-                    <TagIcon className="w-4 h-4 mr-2 text-cyan-600" />
-                    <span className="ml-1 space-x-2">
-                      {tags.slice(0, 3).map((tag, index) => (
-                        <span
-                          key={index}
-                          className="inline-block bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-medium hover:bg-cyan-100 transition"
-                          itemProp="keywords"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                      {tags.length > 3 && <span className="text-xs text-gray-400">...</span>}
-                    </span>
-                  </span>
-                )}
-                {/* Organization as author */}
-                <meta itemProp="author" content="Birds Of Eden" />
-                <meta itemProp="dateModified" content={new Date(dateStr).toISOString()} />
-              </div>
-
-              <div className="relative group/content">
                 {isAuthed && (
                   <button
-                    onClick={openEdit}
-                    title="Edit content"
-                    className="absolute -right-2 -top-2 rounded-full bg-cyan-600 text-white p-2 shadow-lg hover:bg-cyan-700 opacity-0 group-hover/content:opacity-100 transition z-10"
+                    type="button"
+                    onClick={() => openEdit("title")}
+                    title="Edit title"
+                    className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 focus:opacity-100
+                               transition rounded-full bg-cyan-600 text-white p-2 shadow-lg hover:bg-cyan-700"
                   >
-                    ✎
+                    {/* icon */}
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none"
+                      viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round"
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
                   </button>
                 )}
+              </div>
+
+              {/* Category */}
+              {post.category && (
+                <div>
+                  <span
+                    className="text-sm font-semibold uppercase text-cyan-600 border border-cyan-200 bg-cyan-50 px-3 py-1 rounded-full tracking-wider"
+                    itemProp="articleSection"
+                  >
+                    {post.category}
+                  </span>
+                </div>
+              )}
+
+              {/* Content */}
+              <div className="relative group">
+                {isAuthed && (
+                  <button
+                    type="button"
+                    onClick={() => openEdit("content")}
+                    title="Edit content"
+                    className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 focus:opacity-100
+                               transition rounded-full bg-cyan-600 text-white p-2 shadow-lg hover:bg-cyan-700 z-10"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none"
+                      viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round"
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                  </button>
+                )}
+
                 <div
                   className="blog-content mt-2 max-w-none text-slate-800 overflow-x-auto"
                   dangerouslySetInnerHTML={{ __html: post.post_content }}
                   itemProp="articleBody"
                 />
               </div>
+
+              {/* meta for crawlers */}
+              <div className="sr-only">
+                <time dateTime={dateISO} itemProp="datePublished">{dateISO}</time>
+                <meta itemProp="dateModified" content={dateISO} />
+                <meta itemProp="author" content="Moving Quote New York" />
+                {keywords && <meta itemProp="keywords" content={keywords} />}
+              </div>
             </div>
           </article>
-        </div>
 
-        <Categories />
+          {/* Sidebar */}
+          <aside className="lg:col-span-4 mt-12 lg:mt-0" aria-label="Article details">
+            <div className="lg:sticky lg:top-10">
+              <div className="p-6 border border-slate-100 rounded-xl bg-slate-50 shadow-md">
+                <p className="text-sm font-semibold uppercase text-slate-500 mb-4 tracking-wider">
+                  Article Details
+                </p>
 
-        {/* EDIT MODAL */}
-        {isEditOpen && (
-          <div
-            className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4"
-            role="dialog"
-            aria-modal="true"
-            onClick={closeEdit}
-          >
-            <div
-              className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <h3 className="text-xl font-semibold text-gray-900">Edit Blog Post</h3>
-                <button onClick={closeEdit} className="text-gray-400 hover:text-gray-500 transition-colors">
-                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <svg className="w-5 h-5 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <div>
+                      <p className="text-xs text-slate-500">Published</p>
+                      <p className="font-semibold text-slate-800">
+                        {new Date(post.createdAt).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <svg className="w-5 h-5 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <p className="text-xs text-slate-500">Reading Time</p>
+                      <p className="font-semibold text-slate-800">{readTime} min read</p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="overflow-y-auto p-6">
-                <form onSubmit={handleUpdate}>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Post Title</label>
-                      <input
-                        type="text"
-                        name="post_title"
-                        value={editForm.post_title}
-                        onChange={(e) => setEditForm((p) => ({ ...p, post_title: e.target.value }))}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                      <input
-                        type="text"
-                        name="category"
-                        value={editForm.category}
-                        onChange={(e) => setEditForm((p) => ({ ...p, category: e.target.value }))}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
-                    <input
-                      type="text"
-                      name="tags"
-                      value={editForm.tags}
-                      onChange={(e) => setEditForm((p) => ({ ...p, tags: e.target.value }))}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                    />
-                  </div>
-
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Post Content</label>
-                    <RichTextEditor
-                      value={editForm.post_content}
-                      onChange={(content) => setEditForm((p) => ({ ...p, post_content: content }))}
-                    />
-                  </div>
-
-                  <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                    <button
-                      type="button"
-                      onClick={closeEdit}
-                      className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
-                    >
-                      Save Changes
-                    </button>
-                  </div>
-                </form>
+              <div className="mt-8 text-center">
+                <Link href="/allBlogs" className="text-cyan-600 font-semibold hover:text-cyan-700 transition">
+                  Browse All Articles →
+                </Link>
               </div>
             </div>
+          </aside>
+        </main>
+      </div>
+
+      {/* Edit Modal unchanged */}
+      {isFormVisible && (
+        <div
+          className="fixed inset-0 bg-gray-500 bg-opacity-70 flex justify-center items-center z-50"
+          role="dialog"
+          aria-modal="true"
+          onClick={handleCloseModal}
+        >
+          <div
+            className="bg-white rounded-xl p-8 w-11/12 max-w-4xl shadow-lg overflow-y-auto max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between mb-2">
+              <h2 className="text-2xl font-bold">Edit Blog</h2>
+              <button onClick={handleCloseModal} className="text-gray-500 font-bold text-xl">
+                &times;
+              </button>
+            </div>
+
+            <BlogPostForm
+              initialData={editBlogData!}
+              onClose={handleCloseModal}
+              onUpdate={handleUpdateBlog}
+            />
           </div>
-        )}
-        {/* End Edit Modal */}
-      </main>
+        </div>
+      )}
     </>
   );
 }

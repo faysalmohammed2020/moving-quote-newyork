@@ -1,200 +1,117 @@
 "use client";
-
-import React, { useEffect, useMemo, useState } from "react";
-
-const API_URL = "/api/blogs";
-
-export interface BlogPostDTO {
-  id: number;
-  post_title: string;
-  post_content: string;     // We send/receive plain HTML string (stored in Prisma Json)
-  category: string;
-  tags?: string | null;
-  post_status?: string | null;
-  post_excerpt?: string | null;
-  post_author?: number | null;
-  createdAt?: string;
-}
+import React, { useState, useEffect } from "react";
+import RichTextEditor from "./RichTextEditor";
 
 interface BlogPostFormProps {
-  blog?: BlogPostDTO | null;     // when provided -> edit mode
-  closeForm: () => void;
-  onSaved?: (saved: BlogPostDTO) => void; // parent can refresh table
+  initialData?: {
+    id?: number;
+    post_title: string;
+    post_content: string;
+    post_category?: string;
+    post_tags?: string;
+  } | null; // Allow null
+  onClose: () => void;
+  onUpdate: (updatedBlog: any) => void; // Pass updated data to the parent
 }
 
-const BlogPostForm: React.FC<BlogPostFormProps> = ({ blog, closeForm, onSaved }) => {
-  const isEditing = !!blog?.id;
+interface FormData {
+  id?: number;
+  title: string;
+  content: string;
+  category: string;
+  tags?: string; // Made optional
+}
 
-  const [formData, setFormData] = useState<BlogPostDTO>({
-    id: 0,
-    post_title: "",
-    post_content: "",
-    category: "",
-    tags: "",
-    post_status: "Draft",
-    post_excerpt: "",
-    post_author: undefined,
+const BlogPostForm: React.FC<BlogPostFormProps> = ({
+  initialData,
+  onClose,
+  onUpdate,
+}) => {
+  const [formData, setFormData] = useState<FormData>({
+    id: initialData?.id || undefined,
+    title: initialData?.post_title || "",
+    content: initialData?.post_content || "",
+    category: initialData?.post_category || "",
+    tags: initialData?.post_tags || "",
   });
 
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // hydrate form in edit mode
   useEffect(() => {
-    if (blog) {
+    if (initialData) {
       setFormData({
-        id: blog.id ?? 0,
-        post_title: blog.post_title ?? "",
-        post_content:
-          typeof blog.post_content === "string" ? blog.post_content : JSON.stringify(blog.post_content ?? ""),
-        category: blog.category ?? "",
-        tags: blog.tags ?? "",
-        post_status: blog.post_status ?? "Draft",
-        post_excerpt: blog.post_excerpt ?? "",
-        post_author: blog.post_author ?? undefined,
-        createdAt: blog.createdAt,
+        id: initialData.id || undefined,
+        title: initialData.post_title || "",
+        content: initialData.post_content || "",
+        category: initialData.post_category || "",
+        tags: initialData.post_tags || "",
       });
     }
-  }, [blog]);
-
-  const canSubmit = useMemo(() => {
-    return !!formData.post_title?.trim() && !!formData.post_content?.trim() && !!formData.category?.trim();
-  }, [formData.post_title, formData.post_content, formData.category]);
+  }, [initialData]);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => {
-      if (name === "post_author") {
-        const num = value === "" ? undefined : Number(value);
-        return { ...prev, post_author: Number.isNaN(num) ? undefined : num };
-      }
-      return { ...prev, [name]: value };
-    });
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
 
-    if (!canSubmit) {
-      setError("Title, content, and category are required.");
-      return;
-    }
+    const formToSubmit = {
+      id: formData.id,
+      post_title: formData.title, // Ensure correct field names
+      post_content: formData.content,
+      category: formData.category,
+      tags: formData.tags || "",
+    };
 
     try {
-      setSubmitting(true);
-
-      const payload = {
-        id: formData.id,
-        post_title: formData.post_title,
-        post_content: formData.post_content, // HTML string; your route stores it in Json field
-        category: formData.category,
-        tags: formData.tags ?? "",
-        // The POST route also allows these:
-        post_status: formData.post_status ?? "Draft",
-        post_excerpt: formData.post_excerpt ?? "",
-        post_author: formData.post_author ?? undefined,
-      };
-
-      const res = await fetch(API_URL, {
-        method: isEditing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          isEditing
-            ? // PUT expects: { id, post_title, post_content, category, tags }
-              {
-                id: payload.id,
-                post_title: payload.post_title,
-                post_content: payload.post_content,
-                category: payload.category,
-                tags: payload.tags,
-              }
-            : // POST accepts more
-              {
-                post_title: payload.post_title,
-                post_content: payload.post_content,
-                category: payload.category,
-                tags: payload.tags,
-                post_status: payload.post_status,
-                post_excerpt: payload.post_excerpt,
-                post_author: payload.post_author,
-              }
-        ),
+      const response = await fetch("/api/blogs", {
+        // Ensure correct API path
+        method: formData.id ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formToSubmit),
       });
 
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j?.error || `Request failed (${res.status})`);
+      const result = await response.json();
+
+      if (response.ok) {
+        alert(
+          formData.id ? "Blog updated successfully!" : "Blog post created!"
+        );
+        onUpdate(result); // Pass the updated data to parent
+        onClose();
+      } else {
+        alert("Failed to save blog post. Please try again.");
       }
-
-      const saved: BlogPostDTO = await res.json();
-      if (onSaved) onSaved(saved);
-
-      // reset & close
-      setFormData({
-        id: 0,
-        post_title: "",
-        post_content: "",
-        category: "",
-        tags: "",
-        post_status: "Draft",
-        post_excerpt: "",
-        post_author: undefined,
-      });
-      closeForm();
-    } catch (err: any) {
-      setError(err?.message || "Something went wrong.");
-      console.error(err);
-    } finally {
-      setSubmitting(false);
+    } catch (error) {
+      alert("An unexpected error occurred. Please try again.");
     }
   };
 
   return (
-    <form className="space-y-4" onSubmit={handleSubmit}>
-      {error && (
-        <div className="rounded-md border border-red-300 bg-red-50 p-2 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
+    <form onSubmit={handleSubmit} className="p-6 space-y-6">
       <div>
-        <label htmlFor="post_title" className="block text-sm font-medium text-gray-700">
-          Title *
+        <label htmlFor="title" className="block text-lg font-medium mb-2">
+          Blog Title
         </label>
         <input
           type="text"
-          id="post_title"
-          name="post_title"
-          value={formData.post_title}
+          id="title"
+          name="title"
+          value={formData.title}
           onChange={handleChange}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg"
           placeholder="Enter blog title"
-          className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           required
         />
       </div>
 
       <div>
-        <label htmlFor="post_content" className="block text-sm font-medium text-gray-700">
-          Content (HTML) *
-        </label>
-        <textarea
-          id="post_content"
-          name="post_content"
-          value={formData.post_content}
-          onChange={handleChange}
-          placeholder="Write your blog content (HTML or plain text)"
-          rows={6}
-          className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          required
-        />
-      </div>
-
-      <div>
-        <label htmlFor="category" className="block text-sm font-medium text-gray-700">
-          Category *
+        <label htmlFor="category" className="block text-lg font-medium mb-2">
+          Category
         </label>
         <input
           type="text"
@@ -202,90 +119,48 @@ const BlogPostForm: React.FC<BlogPostFormProps> = ({ blog, closeForm, onSaved })
           name="category"
           value={formData.category}
           onChange={handleChange}
-          placeholder="e.g. Tech"
-          className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+          placeholder="Enter blog category"
           required
         />
       </div>
 
       <div>
-        <label htmlFor="tags" className="block text-sm font-medium text-gray-700">
-          Tags
+        <label htmlFor="tags" className="block text-lg font-medium mb-2">
+          Tags (Optional)
         </label>
         <input
           type="text"
           id="tags"
           name="tags"
-          value={formData.tags ?? ""}
+          value={formData.tags}
           onChange={handleChange}
-          placeholder="e.g. nextjs, prisma"
-          className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+          placeholder="Enter tags separated by commas"
         />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div>
-          <label htmlFor="post_status" className="block text-sm font-medium text-gray-700">
-            Status
-          </label>
-          <select
-            id="post_status"
-            name="post_status"
-            value={formData.post_status ?? "Draft"}
-            onChange={handleChange}
-            className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            <option value="Draft">Draft</option>
-            <option value="Published">Published</option>
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="post_author" className="block text-sm font-medium text-gray-700">
-            Author ID
-          </label>
-          <input
-            type="number"
-            id="post_author"
-            name="post_author"
-            value={formData.post_author ?? ""}
-            onChange={handleChange}
-            placeholder="Numeric user id (optional)"
-            className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          />
-        </div>
       </div>
 
       <div>
-        <label htmlFor="post_excerpt" className="block text-sm font-medium text-gray-700">
-          Excerpt
+        <label htmlFor="content" className="block text-lg font-medium mb-2">
+          Blog Content
         </label>
-        <textarea
-          id="post_excerpt"
-          name="post_excerpt"
-          value={formData.post_excerpt ?? ""}
-          onChange={handleChange}
-          placeholder="Short summary (optional)"
-          rows={3}
-          className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+        <RichTextEditor
+          value={formData.content}
+          onChange={(content) =>
+            setFormData((prev) => ({
+              ...prev,
+              content,
+            }))
+          }
         />
       </div>
 
-      <div className="flex justify-between">
-        <button
-          type="button"
-          className="px-4 py-2 bg-gray-300 text-gray-700 font-medium rounded-md hover:bg-gray-400"
-          onClick={closeForm}
-          disabled={submitting}
-        >
-          Cancel
-        </button>
+      <div className="text-right">
         <button
           type="submit"
-          className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-md hover:bg-indigo-700 disabled:opacity-60"
-          disabled={!canSubmit || submitting}
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          {submitting ? (isEditing ? "Updating..." : "Submitting...") : isEditing ? "Update Post" : "Submit"}
+          {formData.id ? "Update Blog" : "Publish Blog"}
         </button>
       </div>
     </form>

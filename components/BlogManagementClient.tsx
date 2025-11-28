@@ -79,21 +79,26 @@ const getFirstLine = (html: string) => {
   return line;
 };
 
+/* ✅ Skeleton Card (cleaner) */
 const SkeletonCard: React.FC = React.memo(() => (
-  <div className="bg-white rounded-2xl overflow-hidden shadow-md border border-gray-100 animate-pulse">
-    <div className="w-full h-48 bg-gray-200" />
+  <article className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm animate-pulse">
+    <div className="h-48 bg-gray-200" />
     <div className="p-5 space-y-3">
-      <div className="h-3 w-20 bg-gray-200 rounded" />
-      <div className="h-6 w-3/4 bg-gray-200 rounded" />
+      <div className="h-3 w-24 bg-gray-200 rounded" />
+      <div className="h-6 w-4/5 bg-gray-200 rounded" />
       <div className="h-3 w-full bg-gray-200 rounded" />
       <div className="h-3 w-5/6 bg-gray-200 rounded" />
       <div className="h-3 w-2/3 bg-gray-200 rounded" />
+      <div className="pt-3 mt-3 border-t border-gray-100 flex justify-between">
+        <div className="h-3 w-16 bg-gray-200 rounded" />
+        <div className="h-8 w-20 bg-gray-200 rounded-full" />
+      </div>
     </div>
-  </div>
+  </article>
 ));
 SkeletonCard.displayName = "SkeletonCard";
 
-/** ✅ Admin card view */
+/** ✅ Admin card view (premium like earlier) */
 const AdminBlogCard: React.FC<{
   post: Blog;
   onEdit: (b: Blog) => void;
@@ -114,54 +119,63 @@ const AdminBlogCard: React.FC<{
   );
 
   return (
-    <div className="bg-white rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 border border-gray-100 flex flex-col">
-      <Link href={`/blog/${post.id}`} className="group">
+    <article className="group bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-md hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col">
+      {/* Image */}
+      <Link href={`/blog/${post.id}`} className="relative block">
         <div className="relative w-full h-48 overflow-hidden">
           <Image
             src={safeImg}
             alt={post.post_title}
             fill
             loading="lazy"
-            className="object-cover group-hover:scale-105 transition-transform duration-500"
+            className="object-cover group-hover:scale-110 transition-transform duration-700"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-70" />
+          <div className="absolute left-3 top-3">
+            <span className="text-xs font-semibold uppercase tracking-wider bg-white/90 text-indigo-700 px-3 py-1 rounded-full shadow-sm">
+              {post.post_category || "Uncategorized"}
+            </span>
+          </div>
         </div>
       </Link>
 
+      {/* Content */}
       <div className="p-6 flex flex-col flex-1">
-        <span className="text-xs font-semibold uppercase text-indigo-600 tracking-widest mb-2">
-          {post.post_category || "Uncategorized"}
-        </span>
-
-        <h2 className="text-xl font-bold text-gray-900 leading-tight mb-2 line-clamp-2">
+        <h2 className="text-lg md:text-xl font-bold text-gray-900 leading-tight mb-2 line-clamp-2 group-hover:text-indigo-600 transition-colors">
           {post.post_title}
         </h2>
 
-        <p className="text-gray-600 line-clamp-3 flex-1">
+        <p className="text-gray-600 text-sm md:text-base line-clamp-3 flex-1 leading-relaxed">
           {post.excerpt || "—"}
         </p>
 
-        <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
-          <span>{postDate}</span>
+        {/* Meta */}
+        <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs md:text-sm text-gray-500">
+          <span className="inline-flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            {postDate}
+          </span>
           <span>{post.readTime || 1} min read</span>
         </div>
 
+        {/* Actions */}
         <div className="mt-4 flex gap-2">
           <button
             onClick={() => onEdit(post)}
-            className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            className="flex-1 px-3 py-2 text-sm font-semibold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-sm"
           >
             Edit
           </button>
           <button
             onClick={() => onDelete(post.id)}
-            className="px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
+            className="flex-1 px-3 py-2 text-sm font-semibold bg-red-600 text-white rounded-xl hover:bg-red-700 transition shadow-sm"
           >
             Delete
           </button>
         </div>
       </div>
-    </div>
+    </article>
   );
 });
 AdminBlogCard.displayName = "AdminBlogCard";
@@ -198,7 +212,6 @@ const BlogManagementClient: React.FC<{
 
   /** ✅ Fetch one page from server */
   useEffect(() => {
-    // skip only once (first server page already rendered)
     if (!didSkipInitial.current && currentPage === initialMeta.page) {
       didSkipInitial.current = true;
       return;
@@ -245,7 +258,6 @@ const BlogManagementClient: React.FC<{
           setTotalBlogs(meta.total || mapped.length);
         });
 
-        // prefetch next page
         if (currentPage < (meta.totalPages || 1)) {
           fetch(`/api/blogs?page=${currentPage + 1}&limit=${itemsPerPage}`, {
             cache: "no-store",
@@ -309,8 +321,6 @@ const BlogManagementClient: React.FC<{
         if (!response.ok) throw new Error("Failed to delete");
 
         alert("Blog post deleted successfully!");
-
-        // ✅ real refresh same page
         forceReload();
       } catch {
         alert("Failed to delete blog post. Please try again.");
@@ -325,13 +335,12 @@ const BlogManagementClient: React.FC<{
     setEditBlogData(null);
   }, []);
 
-  /** ✅ Blog updated/created -> go page 1 + force refetch */
   const handleUpdateBlog = useCallback(() => {
     setIsFormVisible(false);
     setEditBlogData(null);
 
     if (currentPage !== 1) setCurrentPage(1);
-    else forceReload(); // ✅ if already on page 1, still refetch
+    else forceReload();
   }, [currentPage, forceReload]);
 
   const paginate = (p: number) => {
@@ -361,59 +370,77 @@ const BlogManagementClient: React.FC<{
 
   if (error) {
     return (
-      <p className="text-center text-red-500">
-        Failed to fetch blogs. Please try again later.
-      </p>
+      <div className="py-16 text-center">
+        <p className="text-red-500 font-semibold">
+          Failed to fetch blogs. Please try again later.
+        </p>
+      </div>
     );
   }
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen font-sans">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
-        <h1 className="text-3xl font-bold">Blog Management</h1>
-        <div className="flex gap-3">
-          <input
-            type="text"
-            placeholder="Search title..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-64 border border-slate-400 p-2 rounded-lg"
-          />
+    <div className="min-h-screen bg-gray-50 p-6 md:p-10">
+      {/* ✅ Header (premium) */}
+      <header className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8 mb-8 flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900">
+            Blog Management
+          </h1>
+          <p className="text-gray-500 mt-1 text-sm md:text-base">
+            Manage your blog posts easily from here.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search by title…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full sm:w-72 pl-10 pr-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+            />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              🔍
+            </span>
+          </div>
+
           <button
             onClick={handleCreateNewClick}
-            className="text-lg font-bold bg-blue-500 px-4 py-2 text-white rounded-xl"
+            className="inline-flex items-center justify-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition shadow-sm"
           >
-            Create New +
+            + Create New
           </button>
         </div>
-      </div>
+      </header>
 
-      <hr />
-
+      {/* ✅ Progress bar */}
       {(pageLoading || isPending) && (
-        <div className="w-full h-1 bg-gray-200 rounded my-4 overflow-hidden">
-          <div className="h-full w-1/3 bg-indigo-500 animate-pulse" />
+        <div className="w-full h-1.5 bg-gray-200 rounded-full mb-6 overflow-hidden">
+          <div className="h-full w-1/3 bg-indigo-600 animate-pulse rounded-full" />
         </div>
       )}
 
-      <div className="flex justify-between items-center mt-4 mb-4">
-        <h2 className="text-xl font-bold">
-          Our Blogs: <span className="text-cyan-600">{totalBlogs}</span>
+      {/* ✅ Info row */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6">
+        <h2 className="text-lg md:text-xl font-bold text-gray-800">
+          Total Blogs:{" "}
+          <span className="text-indigo-600">{totalBlogs}</span>
         </h2>
-        <span className="text-sm text-slate-500">
-          Page {currentPage} of {totalPages}
-        </span>
+        <div className="text-sm text-gray-500">
+          Page <span className="font-semibold">{currentPage}</span> of{" "}
+          <span className="font-semibold">{totalPages}</span>
+        </div>
       </div>
 
-      {/* Cards */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      {/* ✅ Cards Grid */}
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
         {pageLoading && blogs.length === 0 ? (
           Array.from({ length: itemsPerPage }).map((_, i) => (
             <SkeletonCard key={i} />
           ))
         ) : filteredPosts.length === 0 ? (
-          <div className="col-span-full text-center text-gray-500 py-10">
+          <div className="col-span-full text-center text-gray-500 py-14 bg-white rounded-xl border">
             No posts found.
           </div>
         ) : (
@@ -428,49 +455,56 @@ const BlogManagementClient: React.FC<{
         )}
       </section>
 
-      {/* Pagination */}
+      {/* ✅ Pagination (premium compact) */}
       {totalPages > 1 && (
-        <div className="flex justify-center mt-14">
-          <nav className="flex space-x-1 p-2 bg-white rounded-xl shadow-lg border border-gray-200">
+        <div className="flex justify-center mt-12">
+          <nav className="flex flex-wrap items-center gap-1 bg-white border border-gray-100 shadow-md rounded-2xl p-2">
             <button
               onClick={() => paginate(currentPage - 1)}
               disabled={currentPage === 1}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
-                currentPage === 1
-                  ? "text-gray-400 cursor-not-allowed"
-                  : "text-gray-700 hover:bg-gray-100"
-              }`}
+              className={`px-4 py-2 text-sm font-semibold rounded-xl transition
+                ${
+                  currentPage === 1
+                    ? "text-gray-400 bg-gray-50 cursor-not-allowed"
+                    : "text-gray-700 hover:bg-gray-50"
+                }`}
             >
               ← Prev
             </button>
 
-            {getPageNumbers().map((page, index) => (
-              <div key={index}>
-                {page === "..." ? (
-                  <span className="px-4 py-2 text-gray-500">...</span>
-                ) : (
-                  <button
-                    onClick={() => paginate(Number(page))}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
+            {getPageNumbers().map((page, index) =>
+              page === "..." ? (
+                <span
+                  key={`dots-${index}`}
+                  className="px-3 py-2 text-gray-400 text-sm"
+                >
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={page as number}
+                  onClick={() => paginate(Number(page))}
+                  className={`min-w-[40px] px-4 py-2 text-sm font-semibold rounded-xl transition
+                    ${
                       currentPage === page
-                        ? "bg-indigo-600 text-white shadow-md hover:bg-indigo-700"
-                        : "text-gray-700 hover:bg-gray-100"
+                        ? "bg-indigo-600 text-white shadow hover:bg-indigo-700"
+                        : "text-gray-700 hover:bg-gray-50"
                     }`}
-                  >
-                    {page}
-                  </button>
-                )}
-              </div>
-            ))}
+                >
+                  {page}
+                </button>
+              )
+            )}
 
             <button
               onClick={() => paginate(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
-                currentPage === totalPages
-                  ? "text-gray-400 cursor-not-allowed"
-                  : "text-gray-700 hover:bg-gray-100"
-              }`}
+              className={`px-4 py-2 text-sm font-semibold rounded-xl transition
+                ${
+                  currentPage === totalPages
+                    ? "text-gray-400 bg-gray-50 cursor-not-allowed"
+                    : "text-gray-700 hover:bg-gray-50"
+                }`}
             >
               Next →
             </button>
@@ -478,27 +512,27 @@ const BlogManagementClient: React.FC<{
         </div>
       )}
 
-      {/* Modal */}
+      {/* ✅ Modal (same logic, nicer shell) */}
       {isFormVisible && (
         <div
-          className="fixed inset-0 bg-gray-500 bg-opacity-70 flex justify-center items-center z-50"
+          className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4"
           role="dialog"
           aria-modal="true"
           onClick={handleCloseModal}
         >
           <div
-            className="bg-white rounded-xl p-8 w-11/12 max-w-4xl shadow-lg overflow-y-auto max-h-[90vh]"
+            className="bg-white rounded-2xl p-6 md:p-8 w-full max-w-4xl shadow-2xl overflow-y-auto max-h-[92vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between mb-2">
-              <h2 className="text-2xl font-bold">
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900">
                 {editBlogData ? "Edit Blog" : "Create New Blog"}
               </h2>
               <button
                 onClick={handleCloseModal}
-                className="text-gray-500 font-bold text-xl"
+                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 text-xl font-bold transition"
               >
-                &times;
+                ×
               </button>
             </div>
 

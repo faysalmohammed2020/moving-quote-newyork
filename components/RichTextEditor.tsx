@@ -13,7 +13,7 @@ interface RichTextEditorProps {
 const RichTextEditor: React.FC<RichTextEditorProps> = ({
   value,
   onChange,
-  height = 400,
+  height = 560, // ⬅️ শুধু এটুকু বড় করলাম
 }) => {
   // Upload helper: sends the file to /api/upload and returns the URL (e.g. "/image/xxx.jpg")
   const uploadToServer = async (file: File): Promise<string> => {
@@ -69,8 +69,45 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           "bold italic forecolor | alignleft aligncenter " +
           "alignright alignjustify | bullist numlist outdent indent | " +
           "removeformat | image | code | help",
-        content_style:
-          "body { font-family:Helvetica,Arial,sans-serif; font-size:14px } img{max-width:100%;height:auto;}",
+
+        // 🔥 শুধু writing field বড় / আরামদায়ক করার জন্য আপডেট
+        content_style: `
+          body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            font-size: 17px;
+            line-height: 1.85;
+            padding: 28px 30px;
+            box-sizing: border-box;
+            margin: 0;
+            background: #ffffff;
+          }
+          p {
+            margin: 0 0 1em;
+          }
+          img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 6px;
+          }
+          h1, h2, h3, h4, h5, h6 {
+            margin-top: 1.2em;
+            margin-bottom: 0.55em;
+          }
+          ul, ol {
+            padding-left: 1.6em;
+            margin: 0.5em 0 1em;
+          }
+          table {
+            border-collapse: collapse;
+            width: 100%;
+          }
+          table, th, td {
+            border: 1px solid #e5e7eb;
+          }
+          th, td {
+            padding: 6px 8px;
+          }
+        `,
         
         // ✅ Image upload config
         automatic_uploads: true,
@@ -80,7 +117,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
          * Toolbar-এর Image বাটন, paste, drag-n-drop—TinyMCE এখানেই blob দেয়।
          * আমরা সার্ভারে আপলোড করে URL রিটার্ন করলে TinyMCE নিজে <img src="..."> বসায়।
          */
-        images_upload_handler: async (blobInfo: any/*, progress: (p:number)=>void*/) => {
+        images_upload_handler: async (blobInfo: any /*, progress: (p:number)=>void*/) => {
           const file = blobInfo.blob();
           const url = await uploadToServer(file);
           return url; // TinyMCE expects a string URL

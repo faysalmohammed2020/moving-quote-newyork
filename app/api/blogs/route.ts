@@ -1,7 +1,42 @@
 import { NextResponse } from "next/server";
 import prisma from "@/prisma/prisma";
 
-// ✅ Create New Blog Post
+export const revalidate = 60; // ✅ 60s cache on GET (server-side)
+
+// -------------------- helpers --------------------
+const FALLBACK_IMG = "/placeholder-blog.svg";
+
+function stripHtml(html: string) {
+  return String(html || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractFirstImageServer(html: string) {
+  if (!html) return FALLBACK_IMG;
+
+  // ✅ fast regex first <img src="">
+  const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+  let src = match?.[1] || FALLBACK_IMG;
+
+  // normalize "/public/xxx" -> "/xxx"
+  src = src.replace(/^\/public\//, "/");
+
+  return src || FALLBACK_IMG;
+}
+
+function computeMetaFromContent(rawContent: string) {
+  const plainText = stripHtml(rawContent);
+  const words = plainText ? plainText.split(/\s+/).length : 0;
+  const readTime = Math.max(1, Math.ceil(words / 200));
+  const excerpt = plainText.slice(0, 150);
+  const imageUrl = extractFirstImageServer(rawContent);
+
+  return { plainText, readTime, excerpt, imageUrl };
+}
+
+// -------------------- POST: create --------------------
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -50,11 +85,12 @@ export async function POST(req: Request) {
   }
 }
 
-// ✅ Update Blog Post (supports partial updates incl. status-only)
+// -------------------- PUT: update --------------------
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { id, post_title, post_content, category, tags, post_status } = body ?? {};
+    const { id, post_title, post_content, category, tags, post_status } =
+      body ?? {};
 
     if (!id) {
       return NextResponse.json({ error: "ID is required" }, { status: 400 });
@@ -68,7 +104,10 @@ export async function PUT(req: Request) {
     if (post_status !== undefined) data.post_status = post_status;
 
     if (Object.keys(data).length === 0) {
-      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No fields to update" },
+        { status: 400 }
+      );
     }
 
     data.post_modified = new Date();
@@ -89,7 +128,7 @@ export async function PUT(req: Request) {
   }
 }
 
-// ✅ Delete Blog Post
+// -------------------- DELETE --------------------
 export async function DELETE(req: Request) {
   try {
     const { id } = await req.json();
@@ -118,18 +157,19 @@ export async function DELETE(req: Request) {
   }
 }
 
-// ✅ Fetch All Blog Posts OR a Single Post by ?id=
+// -------------------- GET: single OR list --------------------
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const idParam = searchParams.get("id");
 
-    // Single post by id: /api/blogs?id=123
+    // ✅ Single post
     if (idParam) {
       const id = Number(idParam);
       if (Number.isNaN(id)) {
         return NextResponse.json({ error: "Invalid id" }, { status: 400 });
       }
+
       const post = await prisma.blogPost.findUnique({
         where: { id },
         select: {
@@ -141,24 +181,73 @@ export async function GET(req: Request) {
           post_status: true,
           createdAt: true,
           post_date: true,
+          post_excerpt: true,
         },
       });
+
       if (!post) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
-      return NextResponse.json(post, { status: 200 });
+
+      const rawContent =
+        typeof post.post_content === "object" &&
+        (post.post_content as any)?.text
+          ? (post.post_content as any).text
+          : String(post.post_content || "");
+
+      const { readTime, excerpt, imageUrl } =
+        computeMetaFromContent(rawContent);
+
+      return NextResponse.json(
+        {
+          ...post,
+          post_content: rawContent,
+          excerpt: post.post_excerpt || excerpt,
+          readTime,
+          imageUrl,
+        },
+        { status: 200 }
+      );
     }
 
-    // List with optional filters
+    // ✅ LIST MODE (global image-first + NO hard cap)
+    const mode = searchParams.get("mode");
+    if (mode === "dashboard") {
+      const posts = await prisma.blogPost.findMany({
+        select: {
+          id: true,
+          post_title: true,
+          comment_status: true,
+          createdAt: true,
+          post_date: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      return NextResponse.json({ data: posts, meta: { total: posts.length } });
+    }
+    const titlesOnly = searchParams.get("titles");
+    if (titlesOnly === "1") {
+      const titles = await prisma.blogPost.findMany({
+        select: { id: true, post_title: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+      });
+
+      return NextResponse.json(titles, { status: 200 });
+    }
     const category = searchParams.get("category");
     const authorId = searchParams.get("authorId");
+
+    const page = Math.max(1, Number(searchParams.get("page") || 1));
+    const limit = Math.max(1, Number(searchParams.get("limit") || 6)); // ✅ NO CAP
+    const skip = (page - 1) * limit;
+
     const filters: any = {};
     if (category) filters.category = category;
     if (authorId) filters.post_author = parseInt(authorId);
 
-    const blogPosts = await prisma.blogPost.findMany({
+    const allPosts = await prisma.blogPost.findMany({
       where: filters,
-      orderBy: { createdAt: "desc" },
       select: {
         id: true,
         post_title: true,
@@ -167,12 +256,77 @@ export async function GET(req: Request) {
         tags: true,
         post_status: true,
         createdAt: true,
+        post_excerpt: true,
       },
+      orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json(blogPosts, { status: 200 });
+    const hasImageFast = (content: string) => /<img\s/i.test(content);
+
+    const sortable = allPosts.map((item) => {
+      const rawContent =
+        typeof item.post_content === "object" &&
+        (item.post_content as any)?.text
+          ? (item.post_content as any).text
+          : String(item.post_content || "");
+
+      return {
+        id: item.id,
+        post_title: item.post_title,
+        post_content: rawContent,
+        post_category: item.category || "General",
+        post_tags: item.tags || "",
+        post_status: item.post_status,
+        createdAt: item.createdAt,
+        post_excerpt: item.post_excerpt || "",
+        _hasRealImage: hasImageFast(rawContent),
+      };
+    });
+
+    sortable.sort((a, b) => {
+      if (a._hasRealImage !== b._hasRealImage) {
+        return Number(b._hasRealImage) - Number(a._hasRealImage);
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    const total = sortable.length;
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    const pageSlice = sortable.slice(skip, skip + limit);
+
+    const paginated = pageSlice.map((item) => {
+      const { readTime, excerpt, imageUrl } = computeMetaFromContent(
+        item.post_content
+      );
+
+      return {
+        id: item.id,
+        post_title: item.post_title,
+        post_category: item.post_category,
+        post_tags: item.post_tags,
+        post_status: item.post_status,
+        createdAt: item.createdAt,
+        imageUrl,
+        excerpt: item.post_excerpt || excerpt,
+        readTime,
+      };
+    });
+
+    return NextResponse.json(
+      {
+        data: paginated,
+        meta: {
+          page,
+          limit,
+          total,
+          totalPages,
+        },
+      },
+      { status: 200 }
+    );
   } catch (error) {
-    console.error("Error fetching blog posts:", error);
+    console.error("Error fetching blog posts:", error ?? "unknown error");
     return NextResponse.json(
       { error: "Failed to fetch blog posts." },
       { status: 500 }
