@@ -331,7 +331,7 @@ const HeaderMenu: React.FC = () => {
             {/* Contact */}
             <li>
               <Link
-                href="/contact"
+                href="/contacts"
                 className="hover:text-orange-400 transition-colors duration-200 font-medium"
                 onClick={handleNavigation}
               >

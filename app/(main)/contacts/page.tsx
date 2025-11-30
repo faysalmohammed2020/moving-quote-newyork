@@ -1,5 +1,3 @@
-
-
 import { Mail, Phone, MapPin } from "lucide-react";
 
 const ContactPage: React.FC = () => {
