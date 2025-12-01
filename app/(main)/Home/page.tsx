@@ -5,24 +5,21 @@ import ServiceSection from "@/components/service";
 import SubscriptionSection from "@/components/subscription";
 import TestimonialsSection from "@/components/testimonials";
 import VideoSection from "@/components/video";
-
-
-
+import VisitTracker from "@/components/VisitTracker"; // ✅ এটা add করো
 
 const page = () => {
   return (
     <>
-    
-    <HeroSection/>
-    <ServiceSection/>
+      {/* ✅ home visit count */}
+      <VisitTracker slug="home" />
 
-     <BlogSection/>
-     <TestimonialsSection/>
-     <VideoSection/>
-     <SubscriptionSection/>
-     <Categories/>
-      
-     
+      <HeroSection />
+      <ServiceSection />
+      <BlogSection />
+      <TestimonialsSection />
+      <VideoSection />
+      <SubscriptionSection />
+      <Categories />
     </>
   );
 };

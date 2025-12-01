@@ -196,6 +196,26 @@ const AdminDashboard: React.FC = () => {
 
   const [showFullSubs, setShowFullSubs] = useState(false);
   const fullSubsRef = useRef<HTMLDivElement | null>(null);
+  const [totalVisitorsValue, setTotalVisitorsValue] = useState(0);
+
+  useEffect(() => {
+  const controller = new AbortController();
+
+  const loadVisitors = async () => {
+    try {
+      const res = await fetch("/api/visits?slug=home", {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      const json = await res.json();
+      setTotalVisitorsValue(json.count || 0);
+    } catch (e) {}
+  };
+
+  loadVisitors();
+  return () => controller.abort();
+}, []);
+
 
   useEffect(() => {
     if (showFullSubs) return;
@@ -383,7 +403,6 @@ const AdminDashboard: React.FC = () => {
   );
 
   const {
-    totalVisitorsValue,
     totalVisitorsTrend,
     thisMonthVisitorsValue,
     thisMonthVisitorsTrend,
@@ -562,23 +581,16 @@ const AdminDashboard: React.FC = () => {
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       {/* Analytics Cards */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
         <StatCard
-          title="Total Visitors"
-          value={numberFormatter.format(totalVisitorsValue)}
-          trend={totalVisitorsTrend}
-          icon={<FaEye className="text-xl text-blue-500" />}
-          color="bg-blue-100"
-          loading={subsLoading || isPending}
-        />
-        <StatCard
-          title="This Month (Unique IPs)"
-          value={numberFormatter.format(thisMonthVisitorsValue)}
-          trend={thisMonthVisitorsTrend}
-          icon={<FaChartLine className="text-xl text-purple-500" />}
-          color="bg-purple-100"
-          loading={subsLoading || isPending}
-        />
+  title="Total Visitors"
+  value={numberFormatter.format(totalVisitorsValue)}
+  trend={totalVisitorsTrend}
+  icon={<FaEye className="text-xl text-blue-500" />}
+  color="bg-blue-100"
+  loading={false}
+/>
+
         <StatCard
           title="Total Blogs"
           value={isLoadingBlogs ? "…" : totalBlogs}

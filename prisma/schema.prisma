@@ -138,3 +138,9 @@ model BlogPost {
   comment_count         Int?
   createdAt             DateTime? @default(now())
 }
+model VisitCounter {
+  id        Int      @id @default(autoincrement())
+  slug      String   @unique
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
