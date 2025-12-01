@@ -455,7 +455,7 @@ const HeaderMenu: React.FC = () => {
             <ul className="flex flex-col text-lg">
               <li className="border-b border-gray-100">
                 <Link
-                  href="/home"
+                  href="/"
                   className="block px-6 py-4 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors font-medium"
                   onClick={handleNavigation}
                 >

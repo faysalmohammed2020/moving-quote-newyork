@@ -151,9 +151,12 @@ const BlogSection = () => {
                 {getFirstWords(blog.post_content, 200)}...
               </div>
 
-              <button className="mt-5 bg-yellow-500 text-black px-4 py-2 rounded-full hover:bg-yellow-600 transition-colors">
-                <Link href={`/blogs/${blog.ID}`}>Read More</Link>
-              </button>
+               <Link
+      href={`/blogs/${blog.id}`}
+      className="mt-5 inline-block bg-yellow-500 text-black px-4 py-2 rounded-full hover:bg-yellow-600 transition-colors"
+    >
+      Read More
+    </Link>
             </div>
           ))
         )}

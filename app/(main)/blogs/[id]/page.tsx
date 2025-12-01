@@ -3,7 +3,7 @@
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Head from "next/head";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useSession, signIn } from "next-auth/react";
 import BlogPostForm from "@/components/BlogPostForm";
 
@@ -50,11 +50,17 @@ export default function BlogPost() {
   const searchParams = useSearchParams();
   const urlSlug = searchParams.get("slug") || "";
 
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const isAuthed = status === "authenticated";
 
   const [post, setPost] = useState<Blog | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // ✅ notFound state
+  const [notFound, setNotFound] = useState(false);
+
+  // ✅ StrictMode FIX: only latest request can update state
+  const requestIdRef = useRef(0);
 
   // === unified modal state ===
   const [isFormVisible, setIsFormVisible] = useState(false);
@@ -67,24 +73,44 @@ export default function BlogPost() {
     post_status?: "draft" | "publish" | "private" | string;
   } | null>(null);
 
-  /** ✅ Fetch only the single post by id (FAST + FIXED) */
+  /** ✅ Fetch single post by id (STRICTMODE SAFE) */
   useEffect(() => {
     if (!postId || Number.isNaN(postId)) {
+      setNotFound(true);
+      setPost(null);
       setLoading(false);
       return;
     }
 
     const controller = new AbortController();
+    const myReqId = ++requestIdRef.current; // ✅ unique id
 
     const fetchPost = async () => {
       setLoading(true);
+      setNotFound(false);
+
       try {
         const res = await fetch(`/api/blogs?id=${postId}`, {
           signal: controller.signal,
+          cache: "no-store",
         });
 
-        if (!res.ok) throw new Error("Failed to fetch blog data");
+        // ✅ ignore aborted / stale request
+        if (controller.signal.aborted || myReqId !== requestIdRef.current) return;
+
+        if (!res.ok) {
+          setNotFound(true);
+          setPost(null);
+          return;
+        }
+
         const data = await res.json();
+
+        if (!data || !data.id) {
+          setNotFound(true);
+          setPost(null);
+          return;
+        }
 
         const transformed: Blog = {
           id: data.id,
@@ -100,9 +126,13 @@ export default function BlogPost() {
         };
 
         setPost(transformed);
-      } catch (e) {
-        if ((e as any).name !== "AbortError") console.error(e);
+      } catch (e: any) {
+        if (controller.signal.aborted || myReqId !== requestIdRef.current) return;
+        console.error(e);
+        setNotFound(true);
+        setPost(null);
       } finally {
+        if (controller.signal.aborted || myReqId !== requestIdRef.current) return;
         setLoading(false);
       }
     };
@@ -238,7 +268,7 @@ export default function BlogPost() {
     keywords,
   };
 
-  /** ✅ Skeleton loader (same layout vibe) */
+  /** ✅ Skeleton loader */
   if (loading) {
     return (
       <>
@@ -274,7 +304,8 @@ export default function BlogPost() {
     );
   }
 
-  if (!post) {
+  /** ✅ Not Found only after latest fetch */
+  if (notFound || !post) {
     return (
       <>
         <Head>
@@ -326,7 +357,10 @@ export default function BlogPost() {
         <meta property="og:description" content={description} />
         <meta property="og:url" content={canonical} />
         <meta name="twitter:card" content="summary" />
-        <meta name="twitter:title" content={`${title} | Moving Quote New York Blog`} />
+        <meta
+          name="twitter:title"
+          content={`${title} | Moving Quote New York Blog`}
+        />
         <meta name="twitter:description" content={description} />
         {jsonLd && (
           <script
@@ -384,7 +418,6 @@ export default function BlogPost() {
                     className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 focus:opacity-100
                                transition rounded-full bg-cyan-600 text-white p-2 shadow-lg hover:bg-cyan-700"
                   >
-                    {/* icon */}
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none"
                       viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round"
@@ -431,7 +464,6 @@ export default function BlogPost() {
                 />
               </div>
 
-              {/* meta for crawlers */}
               <div className="sr-only">
                 <time dateTime={dateISO} itemProp="datePublished">{dateISO}</time>
                 <meta itemProp="dateModified" content={dateISO} />
