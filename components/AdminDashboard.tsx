@@ -1099,21 +1099,6 @@ const StatCard: React.FC<StatCardProps> = React.memo(function StatCard({
               <h3 className="text-2xl font-bold text-gray-800">{value}</h3>
             )}
           </div>
-
-          {!loading && trend && (
-            <span
-              className={`text-xs font-medium mt-1 flex items-center ${
-                trend.isPositive ? "text-green-600" : "text-red-600"
-              }`}
-            >
-              {trend.isPositive ? (
-                <FaArrowUp className="mr-1" />
-              ) : (
-                <FaArrowDown className="mr-1" />
-              )}
-              {trend.value}
-            </span>
-          )}
         </div>
         <div className={`p-3 rounded-lg ${color}`}>{icon}</div>
       </div>
