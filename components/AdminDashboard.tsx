@@ -22,14 +22,11 @@ import {
 import {
   FaFileAlt,
   FaEye,
-  FaChartLine,
   FaEdit,
   FaTrash,
   FaGlobeAmericas,
   FaRegChartBar,
   FaBlog,
-  FaArrowUp,
-  FaArrowDown,
 } from "react-icons/fa";
 
 type ApiBlog = {
@@ -39,7 +36,6 @@ type ApiBlog = {
   category?: string;
   tags?: string | string[] | null;
   post_status: string;
-  comment_status?: string;
   createdAt?: string;
   post_date?: string;
 };
@@ -48,7 +44,6 @@ interface Blog {
   id: number;
   post_title: string;
   post_status: string;
-  comment_status: string;
   createdAt?: string | null;
   _d?: Date | null; // ✅ precomputed date
 }
@@ -84,11 +79,6 @@ type Lead = {
 };
 
 type TrendInfo = { value: string; isPositive: boolean };
-
-const normalizeCommentStatus = (val: unknown) => {
-  const s = String(val ?? "").toLowerCase();
-  return s === "open" || s === "closed" ? s : "open";
-};
 
 // ---------- helpers ----------
 function uniq<T>(arr: T[], keyFn: (x: T) => string | number | null | undefined) {
@@ -137,11 +127,11 @@ const runIdle = (cb: () => void) => {
 };
 
 // ---------- Skeleton helpers ----------
-const SkeletonBox: React.FC<{ className?: string }> = React.memo(function SkeletonBox({
-  className = "",
-}) {
-  return <div className={`animate-pulse bg-gray-200 rounded ${className}`} />;
-});
+const SkeletonBox: React.FC<{ className?: string }> = React.memo(
+  function SkeletonBox({ className = "" }) {
+    return <div className={`animate-pulse bg-gray-200 rounded ${className}`} />;
+  }
+);
 SkeletonBox.displayName = "SkeletonBox";
 
 const TableSkeleton: React.FC<{ rows?: number; cols?: number }> = React.memo(
@@ -199,23 +189,22 @@ const AdminDashboard: React.FC = () => {
   const [totalVisitorsValue, setTotalVisitorsValue] = useState(0);
 
   useEffect(() => {
-  const controller = new AbortController();
+    const controller = new AbortController();
 
-  const loadVisitors = async () => {
-    try {
-      const res = await fetch("/api/visits?slug=home", {
-        cache: "no-store",
-        signal: controller.signal,
-      });
-      const json = await res.json();
-      setTotalVisitorsValue(json.count || 0);
-    } catch (e) {}
-  };
+    const loadVisitors = async () => {
+      try {
+        const res = await fetch("/api/visits?slug=home", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const json = await res.json();
+        setTotalVisitorsValue(json.count || 0);
+      } catch (e) {}
+    };
 
-  loadVisitors();
-  return () => controller.abort();
-}, []);
-
+    loadVisitors();
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     if (showFullSubs) return;
@@ -273,13 +262,11 @@ const AdminDashboard: React.FC = () => {
             id: Number(item.id),
             post_title: String(item.post_title || ""),
             post_status: String(item.post_status ?? "draft"),
-            comment_status: normalizeCommentStatus(item.comment_status),
             createdAt,
             _d: d && !isNaN(d.getTime()) ? d : null,
           };
         });
 
-        // ✅ idle + transition to avoid UI freeze
         runIdle(() => {
           startTransition(() => {
             setBlogs(transformed);
@@ -583,13 +570,13 @@ const AdminDashboard: React.FC = () => {
       {/* Analytics Cards */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
         <StatCard
-  title="Total Visitors"
-  value={numberFormatter.format(totalVisitorsValue)}
-  trend={totalVisitorsTrend}
-  icon={<FaEye className="text-xl text-blue-500" />}
-  color="bg-blue-100"
-  loading={false}
-/>
+          title="Total Visitors"
+          value={numberFormatter.format(totalVisitorsValue)}
+          trend={totalVisitorsTrend}
+          icon={<FaEye className="text-xl text-blue-500" />}
+          color="bg-blue-100"
+          loading={false}
+        />
 
         <StatCard
           title="Total Blogs"
@@ -719,7 +706,10 @@ const AdminDashboard: React.FC = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={3} className="px-5 py-8 text-center text-gray-500">
+                      <td
+                        colSpan={3}
+                        className="px-5 py-8 text-center text-gray-500"
+                      >
                         No recent submissions
                       </td>
                     </tr>
@@ -756,7 +746,9 @@ const AdminDashboard: React.FC = () => {
                   {responses.length > 0 ? (
                     responses.map((leadId: any, index: number) => (
                       <tr key={index}>
-                        <td className="px-5 py-4 whitespace-nowrap">#{leadId}</td>
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          #{leadId}
+                        </td>
                         <td className="px-5 py-4 whitespace-nowrap">
                           <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
                             Responded
@@ -767,7 +759,10 @@ const AdminDashboard: React.FC = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={3} className="px-5 py-8 text-center text-gray-500">
+                      <td
+                        colSpan={3}
+                        className="px-5 py-8 text-center text-gray-500"
+                      >
                         No recent responses
                       </td>
                     </tr>
@@ -828,24 +823,54 @@ const AdminDashboard: React.FC = () => {
                   <tbody className="divide-y divide-gray-200">
                     {pagedSubmissions.map((lead) => (
                       <tr key={lead.id}>
-                        <td className="px-4 py-3 whitespace-nowrap">#{lead.id}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          #{lead.id}
+                        </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           {fmt(lead.firstName)} {fmt(lead.lastName)}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">{fmt(lead.email)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{fmt(lead.phone)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{fmt(lead.fromState)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{fmt(lead.fromStateCode)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{fmt(lead.fromCity)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{fmt(lead.fromZip)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{fmt(lead.toState)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{fmt(lead.toStateCode)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{fmt(lead.toCity)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{fmt(lead.toZip)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{fmtDate(lead.moveDate)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{fmt(lead.moveSize)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{fmt(lead.fromIp)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{lead._createdFmt}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {fmt(lead.email)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {fmt(lead.phone)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {fmt(lead.fromState)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {fmt(lead.fromStateCode)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {fmt(lead.fromCity)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {fmt(lead.fromZip)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {fmt(lead.toState)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {fmt(lead.toStateCode)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {fmt(lead.toCity)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {fmt(lead.toZip)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {fmtDate(lead.moveDate)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {fmt(lead.moveSize)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {fmt(lead.fromIp)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {lead._createdFmt}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -895,7 +920,7 @@ const AdminDashboard: React.FC = () => {
         </div>
       </section>
 
-      {/* Recent Blogs (✅ Status column removed) */}
+      {/* Recent Blogs (✅ Status added, ✅ Comments removed) */}
       <section className="mb-8">
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="p-5 border-b border-gray-200 flex justify-between items-center">
@@ -906,6 +931,7 @@ const AdminDashboard: React.FC = () => {
               Add New Post
             </button>
           </div>
+
           <div className="overflow-x-auto">
             {isLoadingBlogs ? (
               <TableSkeleton rows={5} cols={3} />
@@ -916,7 +942,7 @@ const AdminDashboard: React.FC = () => {
                 <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                   <tr>
                     <th className="px-5 py-3 text-left">Title</th>
-                    <th className="px-5 py-3 text-left">Comments</th>
+                    <th className="px-5 py-3 text-left">Status</th>
                     <th className="px-5 py-3 text-left">Actions</th>
                   </tr>
                 </thead>
@@ -929,17 +955,23 @@ const AdminDashboard: React.FC = () => {
                           {blog.post_title}
                         </p>
                       </td>
-                      <td className="px-5 py-4">
+
+                      {/* ✅ Status badge */}
+                      <td className="px-5 py-4 whitespace-nowrap">
                         <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            blog.comment_status === "open"
-                              ? "bg-blue-100 text-blue-800"
+                          className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${
+                            blog.post_status === "publish" ||
+                            blog.post_status === "published"
+                              ? "bg-green-100 text-green-800"
+                              : blog.post_status === "pending"
+                              ? "bg-amber-100 text-amber-800"
                               : "bg-gray-100 text-gray-800"
                           }`}
                         >
-                          {blog.comment_status}
+                          {blog.post_status}
                         </span>
                       </td>
+
                       <td className="px-5 py-4">
                         <div className="flex gap-2">
                           <button
@@ -1026,25 +1058,6 @@ const AdminDashboard: React.FC = () => {
                   <option value="publish">Published</option>
                   <option value="draft">Draft</option>
                   <option value="pending">Pending Review</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Comment Status
-                </label>
-                <select
-                  value={editBlogData.comment_status}
-                  onChange={(e) =>
-                    setEditBlogData({
-                      ...editBlogData,
-                      comment_status: e.target.value,
-                    })
-                  }
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="open">Open</option>
-                  <option value="closed">Closed</option>
                 </select>
               </div>
             </div>
