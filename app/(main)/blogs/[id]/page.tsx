@@ -556,8 +556,6 @@ useEffect(() => {
                     day: "numeric",
                   })}
                 </span>
-                <span className="text-slate-300">•</span>
-                <span>{readTime} min read</span>
 
                 {post.category && (
                   <>
@@ -650,11 +648,6 @@ useEffect(() => {
                             <div className="flex-1 min-w-0">
                               <p className="font-semibold text-slate-900 group-hover:text-cyan-700 line-clamp-2">
                                 {p.post_title}
-                              </p>
-                              <p className="text-xs text-slate-500 mt-1">
-                                {new Date(p.createdAt).toLocaleDateString()}
-                                {" • "}
-                                {(p.readTime ?? 1)} min read
                               </p>
                               {pDesc && (
                                 <p className="text-sm text-slate-600 mt-1 line-clamp-2">

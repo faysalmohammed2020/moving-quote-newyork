@@ -19,7 +19,6 @@ interface Blog {
   createdAt: string;
   imageUrl: string;
   excerpt: string;
-  readTime: number;
 }
 
 interface BlogResponse {
@@ -118,9 +117,6 @@ const BlogCard: React.FC<{ post: Blog }> = React.memo(({ post }) => {
           <div className="mt-6 pt-5 border-t border-gray-200/50 flex items-center justify-between text-sm">
             <span className="text-gray-600 font-medium bg-white/50 px-3 py-1.5 rounded-full">
               {postDate}
-            </span>
-            <span className="text-gray-600 font-semibold bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-full">
-              {post.readTime} min read
             </span>
           </div>
         </div>
