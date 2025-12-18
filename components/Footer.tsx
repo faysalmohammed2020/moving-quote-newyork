@@ -6,16 +6,16 @@ const Footer: React.FC = () => {
     <footer className="bg-[#1C1C1C] text-white py-4">
       <div className="container mx-auto text-center">
         <nav className="mb-2">
-          <Link href="/home" className="mx-2 hover:underline">
+          <Link href="/" className="mx-2 hover:underline">
             Home
           </Link>
-          <Link href="/services" className="mx-2 hover:underline">
+          <Link href="/services/auto-transport" className="mx-2 hover:underline">
             Services
           </Link>
           <Link href="/allTestimonials" className="mx-2 hover:underline">
             About Us
           </Link>
-          <Link href="/Contact" className="mx-2 hover:underline">
+          <Link href="/contacts" className="mx-2 hover:underline">
             Contact
           </Link>
           <Link href="/allBlogs" className="mx-2 hover:underline">

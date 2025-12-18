@@ -464,7 +464,7 @@ const HeaderMenu: React.FC = () => {
               </li>
               <li className="border-b border-gray-100">
                 <Link
-                  href="/services"
+                  href="/services/auto-transport"
                   className="block px-6 py-4 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors font-medium"
                   onClick={handleNavigation}
                 >
@@ -482,7 +482,7 @@ const HeaderMenu: React.FC = () => {
               </li>
               <li className="border-b border-gray-100">
                 <Link
-                  href="/contact"
+                  href="/contacts"
                   className="block px-6 py-4 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors font-medium"
                   onClick={handleNavigation}
                 >
@@ -491,7 +491,7 @@ const HeaderMenu: React.FC = () => {
               </li>
               <li className="border-b border-gray-100">
                 <Link
-                  href="/blog"
+                  href="/allBlogs"
                   className="block px-6 py-4 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors font-medium"
                   onClick={handleNavigation}
                 >
