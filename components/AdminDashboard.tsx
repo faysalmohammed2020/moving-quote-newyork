@@ -117,9 +117,7 @@ const numberFormatter = new Intl.NumberFormat();
 // ✅ idle callback helper
 const runIdle = (cb: () => void) => {
   if (typeof window === "undefined") return cb();
-  // @ts-ignore
   if (window.requestIdleCallback) {
-    // @ts-ignore
     window.requestIdleCallback(cb, { timeout: 500 });
   } else {
     setTimeout(cb, 0);
@@ -188,23 +186,28 @@ const AdminDashboard: React.FC = () => {
   const fullSubsRef = useRef<HTMLDivElement | null>(null);
   const [totalVisitorsValue, setTotalVisitorsValue] = useState(0);
 
-  useEffect(() => {
-    const controller = new AbortController();
+useEffect(() => {
+  const controller = new AbortController();
 
-    const loadVisitors = async () => {
-      try {
-        const res = await fetch("/api/visits?slug=home", {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const json = await res.json();
-        setTotalVisitorsValue(json.count || 0);
-      } catch (e) {}
-    };
+  const loadVisitors = async () => {
+    try {
+      const res = await fetch("/api/visits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: "home" }),
+        cache: "no-store",
+        signal: controller.signal,
+      });
 
-    loadVisitors();
-    return () => controller.abort();
-  }, []);
+      const json: { count?: number } = await res.json();
+      setTotalVisitorsValue(json.count || 0);
+    } catch {}
+  };
+
+  loadVisitors();
+  return () => controller.abort();
+}, []);
+
 
   useEffect(() => {
     if (showFullSubs) return;
@@ -391,8 +394,6 @@ const AdminDashboard: React.FC = () => {
 
   const {
     totalVisitorsTrend,
-    thisMonthVisitorsValue,
-    thisMonthVisitorsTrend,
     totalBlogsTrend,
     totalSubmissionsTrend,
   } = useMemo(() => {

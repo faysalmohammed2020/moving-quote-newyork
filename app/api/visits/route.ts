@@ -1,55 +1,94 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export const runtime = "nodejs";
+// ---- helpers ----
+function getClientIp(req: Request) {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0].trim();
+  const xrip = req.headers.get("x-real-ip");
+  if (xrip) return xrip.trim();
+  return "0.0.0.0";
+}
 
-// ✅ route file load হওয়া মাত্র টার্মিনালে একবার দেখাবে
-console.log("✅ /api/visits route file loaded");
+// ✅ dayKey in UTC (stable). If you want Dhaka day, tell me.
+function getDayKeyUTC(d = new Date()) {
+  return d.toISOString().slice(0, 10); // "YYYY-MM-DD"
+}
 
 export async function POST(req: Request) {
-  console.log("✅ VISITS POST HIT");
-
   try {
     const body = await req.json().catch(() => ({}));
-    console.log("📦 POST BODY =", body);
-
     const slug = body.slug || "home";
-    console.log("🔖 SLUG =", slug);
 
+    const ip = getClientIp(req);
+    const dayKey = getDayKeyUTC();
+
+    // 1) Try to insert VisitLog for (slug, ip, dayKey)
+    // If already exists => P2002 unique error => do NOT increment
+    let isNewToday = false;
+
+    try {
+      await prisma.visitLog.create({
+        data: { slug, ip, dayKey },
+      });
+      isNewToday = true;
+    } catch (e: unknown) {
+      // Prisma unique constraint error code: P2002
+      if (
+        typeof e === "object" &&
+        e !== null &&
+        "code" in e &&
+        (e as { code?: string }).code === "P2002"
+      ) {
+        isNewToday = false;
+      } else {
+        throw e; // real error
+      }
+    }
+
+    // 2) Upsert counter row for (slug, dayKey)
+    // If new visit today => increment, else keep same
     const row = await prisma.visitCounter.upsert({
-      where: { slug },
-      update: { count: { increment: 1 } },
-      create: { slug, count: 1 },
+      where: { slug_dayKey: { slug, dayKey } }, // requires @@unique([slug, dayKey])
+      update: isNewToday ? { count: { increment: 1 } } : {},
+      create: { slug, dayKey, count: 1 },
     });
 
-    console.log("✅ DB UPSERT OK. COUNT =", row.count);
-
-    return NextResponse.json({ ok: true, count: row.count });
+    return NextResponse.json({
+      ok: true,
+      counted: isNewToday, // ✅ true if increment happened
+      dayKey,
+      count: row.count,
+    });
   } catch (e) {
-    console.error("❌ VISITS POST ERROR:", e);
+    console.error("Visits POST error:", e);
     return NextResponse.json(
-      { ok: false, error: "server error" },
+      { ok: false, error: "Failed to track visit" },
       { status: 500 }
     );
   }
 }
 
 export async function GET(req: Request) {
-  console.log("✅ VISITS GET HIT");
-
   try {
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get("slug") || "home";
+    const dayKey = searchParams.get("day") || getDayKeyUTC();
 
-    console.log("🔖 GET SLUG =", slug);
+    const row = await prisma.visitCounter.findUnique({
+      where: { slug_dayKey: { slug, dayKey } },
+    });
 
-    const row = await prisma.visitCounter.findUnique({ where: { slug } });
-
-    console.log("✅ DB FIND OK. ROW =", row);
-
-    return NextResponse.json({ count: row?.count || 0 });
+    return NextResponse.json({
+      ok: true,
+      dayKey,
+      count: row?.count || 0,
+    });
   } catch (e) {
-    console.error("❌ VISITS GET ERROR:", e);
-    return NextResponse.json({ count: 0 }, { status: 500 });
+    console.error("Visits GET error:", e);
+    return NextResponse.json(
+      { ok: false, error: "Failed to fetch visits" },
+      { status: 500 }
+    );
   }
 }
