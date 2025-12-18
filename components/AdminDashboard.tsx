@@ -605,11 +605,11 @@ useEffect(() => {
             <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
               <FaRegChartBar className="text-indigo-500" /> Weekly Performance
             </h2>
-            <select className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white">
+            {/* <select className="text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white">
               <option>Last 7 days</option>
               <option>Last 30 days</option>
               <option>Last 90 days</option>
-            </select>
+            </select> */}
           </div>
 
           {statsLoading ? (
