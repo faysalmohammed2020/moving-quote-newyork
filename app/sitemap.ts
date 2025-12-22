@@ -9,7 +9,7 @@ type BlogResponse = {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl =
     process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, "") ||
-    "http://localhost:3000";
+    "https://movingquotenewyork.com/";
 
   const staticRoutes = [
     "/",
