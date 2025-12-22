@@ -19,6 +19,18 @@ const normalizeImageUrl = (src?: string) => {
   return s;
 };
 
+// ✅ slugify (title -> slug)
+function slugify(input: string) {
+  return (input || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120);
+}
+
 // Function to extract the first image's src from the post_content
 const extractFirstImage = (htmlContent: string): string => {
   const placeholderImage = "https://via.placeholder.com/400x200";
@@ -46,8 +58,17 @@ const getFirstWords = (html: string, wordLimit = 200) => {
   return words.slice(0, wordLimit).join(" ");
 };
 
+type BlogCard = {
+  id?: number | string;
+  post_title?: string;
+  post_content?: string;
+  imageUrl?: string;
+  slug?: string; // ✅ if API provides
+  [key: string]: unknown;
+};
+
 const BlogSection = () => {
-  const [blogCards, setBlogCards] = useState<any[]>([]);
+  const [blogCards, setBlogCards] = useState<BlogCard[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -65,17 +86,27 @@ const BlogSection = () => {
         if (!res.ok) throw new Error("Failed to fetch blogs");
 
         const json = await res.json();
-        const data = json?.data || [];
+        const data: BlogCard[] = Array.isArray(json?.data) ? json.data : [];
 
         // ✅ prefer API image, fallback to first image from content
-        const processedData = data.slice(0, 3).map((blog: any) => {
+        const processedData = data.slice(0, 3).map((blog) => {
           const apiImg =
-            blog.imageUrl || blog.image || blog.post_image || blog.thumbnail;
+            (blog as any).imageUrl ||
+            (blog as any).image ||
+            (blog as any).post_image ||
+            (blog as any).thumbnail;
+
+          const title = String(blog?.post_title ?? "");
+          const derivedSlug =
+            typeof blog?.slug === "string" && blog.slug.trim()
+              ? blog.slug.trim()
+              : slugify(title);
 
           return {
             ...blog,
+            slug: derivedSlug,
             imageUrl: normalizeImageUrl(
-              apiImg || extractFirstImage(blog.post_content)
+              String(apiImg || extractFirstImage(String(blog?.post_content ?? "")))
             ),
           };
         });
@@ -129,36 +160,46 @@ const BlogSection = () => {
             </div>
           </div>
         ) : (
-          blogCards.map((blog, index) => (
-            <div
-              key={index}
-              className="border border-gray-700 bg-gray-900 p-6 text-center shadow-lg rounded-lg hover:shadow-xl transition-shadow duration-300"
-            >
-              {/* ✅ Blog image showing */}
-              <img
-                src={blog.imageUrl}
-                alt={blog.post_title}
-                className="w-full h-40 object-cover rounded-md mb-4"
-                loading="lazy"
-              />
+          blogCards.map((blog, index) => {
+            const title = String(blog.post_title ?? "");
+            const content = String(blog.post_content ?? "");
+            const slug =
+              typeof blog.slug === "string" && blog.slug.trim()
+                ? blog.slug.trim()
+                : slugify(title);
 
-              <h3 className="text-xl font-bold text-yellow-400 mb-4">
-                {blog.post_title}
-              </h3>
+            return (
+              <div
+                key={index}
+                className="border border-gray-700 bg-gray-900 p-6 text-center shadow-lg rounded-lg hover:shadow-xl transition-shadow duration-300"
+              >
+                {/* ✅ Blog image showing */}
+                <img
+                  src={String(blog.imageUrl ?? "")}
+                  alt={title}
+                  className="w-full h-40 object-cover rounded-md mb-4"
+                  loading="lazy"
+                />
 
-              {/* ✅ First 200 words from content */}
-              <div className="text-white text-lg leading-7">
-                {getFirstWords(blog.post_content, 200)}...
+                <h3 className="text-xl font-bold text-yellow-400 mb-4">
+                  {title}
+                </h3>
+
+                {/* ✅ First 200 words from content */}
+                <div className="text-white text-lg leading-7">
+                  {getFirstWords(content, 200)}...
+                </div>
+
+                {/* ✅ slug based route: /:slug */}
+                <Link
+                  href={`/${encodeURIComponent(slug)}`}
+                  className="mt-5 inline-block bg-yellow-500 text-black px-4 py-2 rounded-full hover:bg-yellow-600 transition-colors"
+                >
+                  Read More
+                </Link>
               </div>
-
-               <Link
-      href={`/blogs/${blog.id}`}
-      className="mt-5 inline-block bg-yellow-500 text-black px-4 py-2 rounded-full hover:bg-yellow-600 transition-colors"
-    >
-      Read More
-    </Link>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

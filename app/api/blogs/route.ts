@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/prisma/prisma";
+import type { Prisma } from "@prisma/client";
 
 export const revalidate = 60; // ✅ 60s cache on GET (server-side)
 
@@ -34,6 +35,15 @@ function computeMetaFromContent(rawContent: string) {
   const imageUrl = extractFirstImageServer(rawContent);
 
   return { plainText, readTime, excerpt, imageUrl };
+}
+
+/** ✅ safe extractor for json/html content (replaces all as any) */
+function extractContent(content: unknown): string {
+  if (content && typeof content === "object") {
+    const maybeText = (content as Record<string, unknown>)["text"];
+    if (typeof maybeText === "string") return maybeText;
+  }
+  return String(content ?? "");
 }
 
 // -------------------- POST: create --------------------
@@ -96,7 +106,7 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: "ID is required" }, { status: 400 });
     }
 
-    const data: any = {};
+    const data: Prisma.BlogPostUpdateInput = {}; // ✅ any removed
     if (post_title !== undefined) data.post_title = post_title;
     if (post_content !== undefined) data.post_content = post_content;
     if (category !== undefined) data.category = category;
@@ -158,12 +168,116 @@ export async function DELETE(req: Request) {
 }
 
 // -------------------- GET: single OR list --------------------
+// -------------------- GET: single OR list --------------------
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const idParam = searchParams.get("id");
 
-    // ✅ Single post
+    const idParam = searchParams.get("id");
+    const slugParamRaw = (searchParams.get("slug") || "").trim();
+
+    // ✅ local slugify (server-side)
+    const slugifyServer = (input: string) =>
+      (input || "")
+        .toLowerCase()
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/&/g, "and")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 120);
+
+    // -------------------- ✅ SLUG: single post --------------------
+    // Priority: slug > id (because root url uses slug)
+    if (slugParamRaw) {
+      const slugParam = slugifyServer(slugParamRaw);
+
+      // 1) Try quick "contains" search to reduce scan
+      // (Not perfect but fast; then validate slugify match)
+      const candidate = await prisma.blogPost.findFirst({
+        where: {
+          post_title: { contains: slugParamRaw.replace(/-/g, " "), mode: "insensitive" },
+        },
+        select: {
+          id: true,
+          post_title: true,
+          post_content: true,
+          category: true,
+          tags: true,
+          post_status: true,
+          createdAt: true,
+          post_date: true,
+          post_excerpt: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (candidate && slugifyServer(candidate.post_title || "") === slugParam) {
+        const rawContent = extractContent(candidate.post_content);
+        const { readTime, excerpt, imageUrl } = computeMetaFromContent(rawContent);
+
+        return NextResponse.json(
+          {
+            ...candidate,
+            post_content: rawContent,
+            excerpt: candidate.post_excerpt || excerpt,
+            readTime,
+            imageUrl,
+            slug: slugifyServer(candidate.post_title || ""), // ✅ helpful for canonical
+          },
+          { status: 200 }
+        );
+      }
+
+      // 2) Fallback scan (titles only) then fetch by id
+      // We avoid fetching post_content for all rows
+      const titles = await prisma.blogPost.findMany({
+        select: { id: true, post_title: true },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const match = titles.find((p) => slugifyServer(p.post_title || "") === slugParam);
+
+      if (!match?.id) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+
+      const post = await prisma.blogPost.findUnique({
+        where: { id: match.id },
+        select: {
+          id: true,
+          post_title: true,
+          post_content: true,
+          category: true,
+          tags: true,
+          post_status: true,
+          createdAt: true,
+          post_date: true,
+          post_excerpt: true,
+        },
+      });
+
+      if (!post) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+
+      const rawContent = extractContent(post.post_content);
+      const { readTime, excerpt, imageUrl } = computeMetaFromContent(rawContent);
+
+      return NextResponse.json(
+        {
+          ...post,
+          post_content: rawContent,
+          excerpt: post.post_excerpt || excerpt,
+          readTime,
+          imageUrl,
+          slug: slugifyServer(post.post_title || ""),
+        },
+        { status: 200 }
+      );
+    }
+
+    // -------------------- ✅ ID: single post --------------------
     if (idParam) {
       const id = Number(idParam);
       if (Number.isNaN(id)) {
@@ -189,14 +303,8 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
 
-      const rawContent =
-        typeof post.post_content === "object" &&
-        (post.post_content as any)?.text
-          ? (post.post_content as any).text
-          : String(post.post_content || "");
-
-      const { readTime, excerpt, imageUrl } =
-        computeMetaFromContent(rawContent);
+      const rawContent = extractContent(post.post_content);
+      const { readTime, excerpt, imageUrl } = computeMetaFromContent(rawContent);
 
       return NextResponse.json(
         {
@@ -205,6 +313,7 @@ export async function GET(req: Request) {
           excerpt: post.post_excerpt || excerpt,
           readTime,
           imageUrl,
+          slug: slugifyServer(post.post_title || ""), // ✅ helpful for canonical
         },
         { status: 200 }
       );
@@ -226,6 +335,7 @@ export async function GET(req: Request) {
 
       return NextResponse.json({ data: posts, meta: { total: posts.length } });
     }
+
     const titlesOnly = searchParams.get("titles");
     if (titlesOnly === "1") {
       const titles = await prisma.blogPost.findMany({
@@ -235,16 +345,27 @@ export async function GET(req: Request) {
 
       return NextResponse.json(titles, { status: 200 });
     }
+
     const category = searchParams.get("category");
     const authorId = searchParams.get("authorId");
+    const q = (searchParams.get("q") || "").trim(); // ✅ GLOBAL SEARCH
 
     const page = Math.max(1, Number(searchParams.get("page") || 1));
-    const limit = Math.max(1, Number(searchParams.get("limit") || 6)); // ✅ NO CAP
+    const limit = Math.max(1, Number(searchParams.get("limit") || 6));
     const skip = (page - 1) * limit;
 
-    const filters: any = {};
+    const filters: Prisma.BlogPostWhereInput = {};
     if (category) filters.category = category;
-    if (authorId) filters.post_author = parseInt(authorId);
+    if (authorId) filters.post_author = parseInt(authorId, 10);
+
+    // ✅ SAFE prisma search (title/category/tags only)
+    if (q) {
+      filters.OR = [
+        { post_title: { contains: q, mode: "insensitive" } },
+        { category: { contains: q, mode: "insensitive" } },
+        { tags: { contains: q, mode: "insensitive" } },
+      ];
+    }
 
     const allPosts = await prisma.blogPost.findMany({
       where: filters,
@@ -263,25 +384,32 @@ export async function GET(req: Request) {
 
     const hasImageFast = (content: string) => /<img\s/i.test(content);
 
-    const sortable = allPosts.map((item) => {
-      const rawContent =
-        typeof item.post_content === "object" &&
-        (item.post_content as any)?.text
-          ? (item.post_content as any).text
-          : String(item.post_content || "");
+    const sortable = allPosts
+      .map((item) => {
+        const rawContent = extractContent(item.post_content);
 
-      return {
-        id: item.id,
-        post_title: item.post_title,
-        post_content: rawContent,
-        post_category: item.category || "General",
-        post_tags: item.tags || "",
-        post_status: item.post_status,
-        createdAt: item.createdAt,
-        post_excerpt: item.post_excerpt || "",
-        _hasRealImage: hasImageFast(rawContent),
-      };
-    });
+        return {
+          id: item.id,
+          post_title: item.post_title,
+          post_content: rawContent,
+          post_category: item.category || "General",
+          post_tags: item.tags || "",
+          post_status: item.post_status,
+          createdAt: item.createdAt,
+          post_excerpt: item.post_excerpt || "",
+          _hasRealImage: hasImageFast(rawContent),
+        };
+      })
+      .filter((item) => {
+        if (!q) return true;
+        const needle = q.toLowerCase();
+        return (
+          String(item.post_title || "").toLowerCase().includes(needle) ||
+          String(item.post_category || "").toLowerCase().includes(needle) ||
+          String(item.post_tags || "").toLowerCase().includes(needle) ||
+          String(item.post_content || "").toLowerCase().includes(needle)
+        );
+      });
 
     sortable.sort((a, b) => {
       if (a._hasRealImage !== b._hasRealImage) {
@@ -292,13 +420,10 @@ export async function GET(req: Request) {
 
     const total = sortable.length;
     const totalPages = Math.ceil(total / limit) || 1;
-
     const pageSlice = sortable.slice(skip, skip + limit);
 
     const paginated = pageSlice.map((item) => {
-      const { readTime, excerpt, imageUrl } = computeMetaFromContent(
-        item.post_content
-      );
+      const { readTime, excerpt, imageUrl } = computeMetaFromContent(item.post_content);
 
       return {
         id: item.id,
@@ -333,3 +458,4 @@ export async function GET(req: Request) {
     );
   }
 }
+

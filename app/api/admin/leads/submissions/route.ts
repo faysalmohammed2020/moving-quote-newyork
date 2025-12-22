@@ -1,6 +1,5 @@
-
 import { NextResponse } from "next/server";
-import {prisma} from "@/lib/prisma"; // update path based on your setup
+import { prisma } from "@/lib/prisma"; // update path if needed
 
 export async function GET() {
   try {
@@ -14,6 +13,16 @@ export async function GET() {
         phone: true,
         fromIp: true,
         createdAt: true,
+        fromState: true,
+        fromStateCode: true,
+        fromCity: true,
+        fromZip: true,
+        toState: true,
+        toStateCode: true,
+        toCity: true,
+        toZip: true,
+        moveDate: true,
+        moveSize: true,
       },
     });
 

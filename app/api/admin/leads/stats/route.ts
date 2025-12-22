@@ -45,8 +45,10 @@ export async function GET() {
       dailyLeads: leadCounts.reverse(),
       dailyResponses: responseCounts.reverse(),
     });
-  } catch (error: any) {
-    console.error("API Error in /api/admin/leads/stats:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error("API Error in /api/admin/leads/stats:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

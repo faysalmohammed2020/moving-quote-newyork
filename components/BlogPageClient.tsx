@@ -31,6 +31,18 @@ interface BlogResponse {
   };
 }
 
+/** ✅ slugify helper */
+function slugify(input: string) {
+  return (input || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120);
+}
+
 /** ✅ normalize any kind of relative image path safely for next/image */
 const normalizeImageUrl = (src?: string) => {
   const fallback = "/placeholder-blog.svg";
@@ -49,19 +61,19 @@ const normalizeImageUrl = (src?: string) => {
 };
 
 const BlogCardSkeleton: React.FC = React.memo(() => (
-  <div className="bg-white/70 backdrop-blur-sm rounded-3xl overflow-hidden shadow-2xl border border-white/20 animate-pulse h-full flex flex-col">
-    <div className="relative w-full h-52 bg-gradient-to-br from-gray-200 via-gray-300 to-gray-200" />
-    <div className="p-7 flex flex-col flex-grow gap-4">
-      <div className="h-4 w-24 bg-gray-300 rounded-full" />
-      <div className="h-7 w-4/5 bg-gray-300 rounded-lg" />
-      <div className="space-y-3 mt-3">
-        <div className="h-3 w-full bg-gray-300 rounded-md" />
-        <div className="h-3 w-5/6 bg-gray-300 rounded-md" />
-        <div className="h-3 w-2/3 bg-gray-300 rounded-md" />
+  <div className="bg-white rounded-2xl overflow-hidden shadow-xl border border-gray-100 animate-pulse h-full flex flex-col">
+    <div className="relative w-full h-48 bg-gray-200" />
+    <div className="p-6 flex flex-col flex-grow gap-3">
+      <div className="h-3 w-20 bg-gray-200 rounded-full" />
+      <div className="h-6 w-3/4 bg-gray-200 rounded-md" />
+      <div className="space-y-2 mt-2">
+        <div className="h-3 w-full bg-gray-200 rounded-md" />
+        <div className="h-3 w-5/6 bg-gray-200 rounded-md" />
+        <div className="h-3 w-2/3 bg-gray-200 rounded-md" />
       </div>
-      <div className="mt-auto pt-5 border-t border-gray-200/50 flex items-center justify-between">
-        <div className="h-3 w-28 bg-gray-300 rounded-full" />
-        <div className="h-3 w-20 bg-gray-300 rounded-full" />
+      <div className="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between">
+        <div className="h-3 w-24 bg-gray-200 rounded-full" />
+        <div className="h-3 w-16 bg-gray-200 rounded-full" />
       </div>
     </div>
   </div>
@@ -80,44 +92,36 @@ const BlogCard: React.FC<{ post: Blog }> = React.memo(({ post }) => {
   );
 
   const safeImg = normalizeImageUrl(post.imageUrl);
+  const postSlug = useMemo(() => slugify(post.post_title || ""), [post.post_title]);
 
   return (
-    <Link href={`/blogs/${post.id}`} className="group block h-full">
-      <div className="bg-white/70 backdrop-blur-sm rounded-3xl overflow-hidden shadow-2xl hover:shadow-3xl transition-all duration-500 transform group-hover:-translate-y-2 h-full flex flex-col border border-white/20 hover:border-white/40 relative">
-        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10" />
-
-        <div className="relative w-full h-52 overflow-hidden">
+    <Link href={`/${encodeURIComponent(postSlug)}`} className="group">
+      <div className="bg-white rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 transform group-hover:-translate-y-1 h-full flex flex-col border border-gray-100">
+        <div className="relative w-full h-48 overflow-hidden">
           <Image
             src={safeImg}
             alt={post.post_title}
             fill
             loading="lazy"
             style={{ objectFit: "cover" }}
-            className="group-hover:scale-110 transition-transform duration-700 ease-out"
+            className="group-hover:scale-105 transition-transform duration-500 ease-in-out"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-60" />
-
-          <div className="absolute top-4 left-4 z-20">
-            <span className="px-4 py-2 bg-white/90 backdrop-blur-sm text-indigo-700 text-xs font-bold uppercase tracking-wider rounded-full shadow-lg">
-              {post.post_category}
-            </span>
-          </div>
         </div>
 
-        <div className="p-7 flex flex-col flex-grow relative z-20">
-          <h2 className="text-2xl font-bold text-gray-900 leading-tight mb-4 group-hover:text-indigo-800 transition-colors duration-300 line-clamp-2">
+        <div className="p-6 flex flex-col flex-grow">
+          <span className="text-xs font-semibold uppercase text-indigo-600 tracking-widest mb-2">
+            {post.post_category}
+          </span>
+
+          <h2 className="text-2xl font-bold text-gray-900 leading-tight mb-3 group-hover:text-indigo-700 transition-colors">
             {post.post_title}
           </h2>
 
-          <p className="text-gray-700 line-clamp-3 flex-grow leading-relaxed">
-            {post.excerpt}...
-          </p>
+          <p className="text-gray-600 line-clamp-3 flex-grow">{post.excerpt}...</p>
 
-          <div className="mt-6 pt-5 border-t border-gray-200/50 flex items-center justify-between text-sm">
-            <span className="text-gray-600 font-medium bg-white/50 px-3 py-1.5 rounded-full">
-              {postDate}
-            </span>
+          <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
+            <span>{postDate}</span>
           </div>
         </div>
       </div>
@@ -125,6 +129,10 @@ const BlogCard: React.FC<{ post: Blog }> = React.memo(({ post }) => {
   );
 });
 BlogCard.displayName = "BlogCard";
+
+function isAbortError(err: unknown) {
+  return err instanceof DOMException && err.name === "AbortError";
+}
 
 export default function BlogPageClient({
   initialBlogs,
@@ -156,10 +164,10 @@ export default function BlogPageClient({
       setPageLoading(true);
 
       try {
-        const res = await fetch(
-          `/api/blogs?page=${page}&limit=${postsPerPage}`,
-          { signal: controller.signal, cache: "no-store" }
-        );
+        const res = await fetch(`/api/blogs?page=${page}&limit=${postsPerPage}`, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
         if (!res.ok) throw new Error("Failed to fetch blogs");
 
         const json: BlogResponse = await res.json();
@@ -181,8 +189,8 @@ export default function BlogPageClient({
             })
             .catch(() => {});
         }
-      } catch (e: any) {
-        if (e.name !== "AbortError") {
+      } catch (e: unknown) {
+        if (!isAbortError(e)) {
           console.error(e);
           setError("Failed to load articles. Please check your connection.");
         }
@@ -224,168 +232,69 @@ export default function BlogPageClient({
       return [1, 2, 3, "...", totalPages];
     if (currentPage > totalPages - maxVisiblePages)
       return [1, "...", totalPages - 2, totalPages - 1, totalPages];
-    return [
-      1,
-      "...",
-      currentPage - 1,
-      currentPage,
-      currentPage + 1,
-      "...",
-      totalPages,
-    ];
+    return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
   };
 
   if (error) {
     return (
-      <div className="min-h-[70vh] grid place-items-center bg-gradient-to-br from-red-50 via-white to-red-50">
-        <div className="text-center p-12 bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-red-200/50 max-w-md mx-4">
-          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg
-              className="w-10 h-10 text-red-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-              />
-            </svg>
-          </div>
-          <h3 className="text-2xl font-bold text-red-800 mb-3">
-            Connection Error
-          </h3>
-          <p className="text-red-600 leading-relaxed">{error}</p>
+      <div className="min-h-[60vh] grid place-items-center bg-red-50">
+        <div className="text-center p-8 bg-white rounded-xl shadow-lg border border-red-200">
+          <p className="text-xl font-semibold text-red-700">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 py-20">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-200/30 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-200/30 rounded-full blur-3xl"></div>
-      </div>
-
-      <div className="container mx-auto px-4 max-w-7xl relative z-10">
-        <div className="text-center mb-20">
-          <div className="inline-flex items-center gap-3 bg-white/70 backdrop-blur-sm px-6 py-3 rounded-full shadow-lg border border-white/20 mb-8">
-            <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
-            <span className="text-indigo-700 font-semibold text-sm uppercase tracking-wider">
-              Latest Insights
-            </span>
-          </div>
-
-          <h1 className="text-6xl font-black text-gray-900 tracking-tight mb-6 bg-gradient-to-r from-gray-900 via-indigo-900 to-gray-900 bg-clip-text text-transparent">
+    <div className="bg-gray-50 min-h-screen py-16">
+      <div className="container mx-auto px-4 max-w-7xl">
+        <div className="text-center mb-12">
+          <h1 className="text-6xl font-extrabold text-gray-900 tracking-tight">
             Our Blogs
           </h1>
-
-          <div className="max-w-2xl mx-auto">
-            <p className="text-xl text-gray-700 leading-relaxed bg-white/50 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-white/30">
-              Explore cutting-edge insights, expert analysis, and transformative
-              ideas that shape the future of technology and innovation.
-            </p>
-          </div>
+          <p className="mt-4 text-xl text-gray-600 max-w-2xl mx-auto">
+            Stay updated with our latest industry deep-dives, expert opinions, and essential guides.
+          </p>
         </div>
 
         {(pageLoading || isPending) && (
-          <div className="sticky top-4 z-50 mb-12 mx-auto max-w-2xl">
-            <div className="bg-white/80 backdrop-blur-sm rounded-full shadow-lg border border-white/30 p-2">
-              <div className="w-full h-2 bg-gray-200/80 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 animate-pulse rounded-full transition-all duration-300"
-                  style={{ width: "65%" }}
-                />
-              </div>
-            </div>
+          <div className="w-full h-1 bg-gray-200 rounded mb-6 overflow-hidden">
+            <div className="h-full w-1/3 bg-indigo-500 animate-pulse" />
           </div>
         )}
 
-        {/* ✅ Updated Blog Grid with Empty State */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-20">
-          {pageLoading || isPending ? (
-            Array.from({ length: postsPerPage }).map((_, i) => (
-              <BlogCardSkeleton key={i} />
-            ))
-          ) : blogs.length === 0 ? (
-            <div className="col-span-full">
-              <div className="min-h-[40vh] grid place-items-center">
-                <div className="text-center p-12 bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-indigo-200/50 max-w-lg mx-4">
-                  <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <svg
-                      className="w-10 h-10 text-indigo-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                      />
-                    </svg>
-                  </div>
-
-                  <h3 className="text-3xl font-extrabold text-indigo-800 mb-3">
-                    No blogs found
-                  </h3>
-                  <p className="text-gray-600 text-lg leading-relaxed">
-                    There are no articles available right now. Please check back
-                    later.
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            blogs.map((post) => <BlogCard key={post.id} post={post} />)
-          )}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
+          {blogs.length === 0 && pageLoading
+            ? Array.from({ length: postsPerPage }).map((_, i) => (
+                <BlogCardSkeleton key={i} />
+              ))
+            : blogs.map((post) => <BlogCard key={post.id} post={post} />)}
         </div>
 
         {totalPages > 1 && (
-          <div className="flex justify-center">
-            <nav className="flex items-center space-x-2 p-3 bg-white/70 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20">
+          <div className="flex justify-center mt-16">
+            <nav className="flex space-x-1 p-2 bg-white rounded-xl shadow-lg border border-gray-200">
               <button
                 onClick={() => paginate(currentPage - 1)}
                 disabled={currentPage === 1}
-                className={`px-5 py-3 text-sm font-semibold rounded-xl transition-all duration-300 flex items-center gap-2 ${
-                  currentPage === 1
-                    ? "text-gray-400 cursor-not-allowed"
-                    : "text-gray-700 hover:bg-white/80 hover:shadow-lg border border-transparent hover:border-white/50"
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
+                  currentPage === 1 ? "text-gray-400 cursor-not-allowed" : "text-gray-700 hover:bg-gray-100"
                 }`}
               >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-                Previous
+                ← Prev
               </button>
 
               {getPageNumbers().map((page, index) => (
                 <div key={index}>
                   {page === "..." ? (
-                    <span className="px-4 py-3 text-gray-500 font-medium">
-                      ...
-                    </span>
+                    <span className="px-4 py-2 text-gray-500">...</span>
                   ) : (
                     <button
                       onClick={() => paginate(Number(page))}
-                      className={`px-5 py-3 text-sm font-bold rounded-xl transition-all duration-300 min-w-[3rem] ${
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
                         currentPage === page
-                          ? "bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40"
-                          : "text-gray-700 hover:bg-white/80 hover:shadow-lg border border-transparent hover:border-white/50"
+                          ? "bg-indigo-600 text-white shadow-md hover:bg-indigo-700"
+                          : "text-gray-700 hover:bg-gray-100"
                       }`}
                     >
                       {page}
@@ -397,26 +306,11 @@ export default function BlogPageClient({
               <button
                 onClick={() => paginate(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className={`px-5 py-3 text-sm font-semibold rounded-xl transition-all duration-300 flex items-center gap-2 ${
-                  currentPage === totalPages
-                    ? "text-gray-400 cursor-not-allowed"
-                    : "text-gray-700 hover:bg-white/80 hover:shadow-lg border border-transparent hover:border-white/50"
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
+                  currentPage === totalPages ? "text-gray-400 cursor-not-allowed" : "text-gray-700 hover:bg-gray-100"
                 }`}
               >
-                Next
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
+                Next →
               </button>
             </nav>
           </div>

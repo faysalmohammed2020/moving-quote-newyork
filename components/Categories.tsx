@@ -16,9 +16,26 @@ type ApiBlog = {
   post_category?: any; // comes from prisma.category
   post_status?: string;
   createdAt?: string;
+  slug?: string | null; // ✅ add slug if your backend sends it
 };
 
-// ✅ slugify normalize
+// ✅ slugify (same logic as blog page)
+function slugify(input: string) {
+  return (input || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120);
+}
+
+function isAbortError(err: unknown) {
+  return err instanceof DOMException && err.name === "AbortError";
+}
+
+// ✅ category normalize
 const normalizeCat = (val: any) => {
   if (!val) return "";
 
@@ -34,7 +51,7 @@ const normalizeCat = (val: any) => {
     .replace(/-+/g, "-");
 };
 
-// ✅ category keys extract (string/object/array/comma)
+// ✅ category keys extract
 const extractCategoryKeys = (post_category: any): string[] => {
   if (!post_category) return [];
 
@@ -68,9 +85,10 @@ const Categories = () => {
           signal: controller.signal,
         });
 
+        if (!res.ok) throw new Error("Failed to fetch blogs");
+
         const json = await res.json();
 
-        // ✅ your API shape: { data: [...], meta: {...} }
         const list: ApiBlog[] = Array.isArray(json?.data)
           ? json.data
           : Array.isArray(json)
@@ -82,18 +100,14 @@ const Categories = () => {
           return st === "publish" || st === "published";
         });
 
-        console.log("✅ BLOGS FROM API:", published);
-        console.log(
-          "✅ BLOG CATEGORY KEYS:",
-          published.map((b) => extractCategoryKeys(b.post_category))
-        );
-
         setBlogs(published);
       } catch (e) {
-        console.error("Fetch error:", e);
-        setBlogs([]);
+        if (!isAbortError(e)) {
+          console.error("Fetch error:", e);
+          setBlogs([]);
+        }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
@@ -101,22 +115,19 @@ const Categories = () => {
     return () => controller.abort();
   }, []);
 
-  // ✅ make place lookup once
+  // ✅ place lookup once
   const placeLookup = useMemo(() => {
     const m = new Map<string, string>();
     placeData.forEach((p) => {
       m.set(normalizeCat(p.name), p.name);
     });
-
-    console.log("✅ PLACE KEYS:", [...m.keys()]);
     return m;
   }, []);
 
-  // ✅ group by place using lookup
+  // ✅ group by place
   const blogsByPlaceKey = useMemo(() => {
     const map = new Map<string, ApiBlog[]>();
 
-    // init all places empty
     for (const key of placeLookup.keys()) {
       map.set(key, []);
     }
@@ -127,12 +138,6 @@ const Categories = () => {
       catKeys.forEach((catKey) => {
         if (map.has(catKey)) {
           map.get(catKey)!.push(b);
-        } else {
-          // ❌ mismatch debug
-          console.warn("❌ CATEGORY NOT MATCHED:", {
-            raw: b.post_category,
-            normalized: catKey,
-          });
         }
       });
     });
@@ -175,7 +180,7 @@ const Categories = () => {
               value={`item-${item.id}`}
               className="bg-gray-800 rounded-lg p-4 shadow-md hover:shadow-lg transition-shadow"
             >
-              <AccordionTrigger className=" text-yellow-500 font-bold">
+              <AccordionTrigger className="text-yellow-500 font-bold">
                 {item.name}
               </AccordionTrigger>
 
@@ -184,19 +189,29 @@ const Categories = () => {
                   <strong>Blogs Title:</strong>
 
                   {catBlogs.length > 0 ? (
-                    catBlogs.map((post) => (
-                      <div
-                        key={post.id}
-                        className="mt-2 bg-gray-700 p-2 rounded-md shadow-sm"
-                      >
-                        <Link
-                          href={`/blogs/${post.id}`}
-                          className="font-bold text-yellow-400"
+                    catBlogs.map((post) => {
+                      // ✅ choose slug: backend slug > title slug
+                      const postSlug =
+                        (typeof post.slug === "string" && post.slug.trim()
+                          ? post.slug.trim()
+                          : slugify(post.post_title)) || "";
+
+                      // ✅ route:
+                      // যদি তোমার blog route root হয় "/[slug]" তাহলে `/${postSlug}`
+                      // যদি "/blogs/[slug]" হয় তাহলে `/blogs/${postSlug}`
+                      const href = `/${encodeURIComponent(postSlug)}`;
+
+                      return (
+                        <div
+                          key={post.id}
+                          className="mt-2 bg-gray-700 p-2 rounded-md shadow-sm"
                         >
-                          {post.post_title}
-                        </Link>
-                      </div>
-                    ))
+                          <Link href={href} className="font-bold text-yellow-400">
+                            {post.post_title}
+                          </Link>
+                        </div>
+                      );
+                    })
                   ) : (
                     <p className="text-gray-400 mt-2">
                       No posts available for this category.

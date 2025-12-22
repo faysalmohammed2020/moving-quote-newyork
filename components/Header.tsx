@@ -7,7 +7,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "@/lib/auth-client";
 
-type BlogLite = { id: number; post_title: string };
+type BlogLite = { id: number; post_title: string; slug?: string };
 
 const API_URL = "/api/blogs";
 
@@ -17,6 +17,18 @@ const CACHE_TIME_KEY = "blog_titles_cache_time_v2";
 
 // ✅ cache TTL (10 minutes)
 const CACHE_TTL_MS = 10 * 60 * 1000;
+
+// ✅ slugify (title -> slug)
+function slugify(input: string) {
+  return (input || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120);
+}
 
 // ---- safe highlight
 const highlightSearchTerm = (text: string, query: string): string => {
@@ -93,9 +105,8 @@ const HeaderMenu: React.FC = () => {
     } catch {}
   }, []);
 
-  // ✅ fetch ALL titles (pagination ignore)
+  // ✅ fetch ALL titles
   const fetchBlogsTitles = useCallback(async (signal?: AbortSignal) => {
-    // 🔥 NEW API param
     const res = await fetch(`${API_URL}?titles=1`, {
       cache: "no-store",
       signal,
@@ -106,14 +117,27 @@ const HeaderMenu: React.FC = () => {
 
     const rows = (await res.json()) as any[];
 
-    const list: BlogLite[] = (Array.isArray(rows) ? rows : rows?.data || []).map(
-      (r: any) => ({
-        id: Number(r.id),
-        post_title: String(r.post_title || r.post_name || ""),
-      })
-    );
+    const rawList = (Array.isArray(rows) ? rows : rows?.data || []) as any[];
 
-    return list.filter((b) => b.id && b.post_title);
+    const list: BlogLite[] = rawList
+      .map((r) => {
+        const title = String(r?.post_title || r?.post_name || "");
+        const apiSlug =
+          typeof r?.slug === "string" && String(r.slug).trim()
+            ? String(r.slug).trim()
+            : "";
+
+        const finalSlug = apiSlug || slugify(title);
+
+        return {
+          id: Number(r?.id),
+          post_title: title,
+          slug: finalSlug,
+        };
+      })
+      .filter((b) => b.id && b.post_title);
+
+    return list;
   }, []);
 
   // ✅ initial load: cache-first + background refresh
@@ -157,21 +181,13 @@ const HeaderMenu: React.FC = () => {
     };
   }, [fetchBlogsTitles, loadFromCache, saveCache]);
 
-  // ✅ filter based on debounced query
-  // 🔥 no search => limit view
-  // 🔥 search => show ALL matching from 301
+  // ✅ filter
   const filteredBlogs = useMemo(() => {
     const q = debouncedQuery.trim().toLowerCase();
 
-    if (!q) {
-      // ✅ default: show only first 10 titles
-      return blogs.slice(0, 10);
-    }
+    if (!q) return blogs.slice(0, 10);
 
-    // ✅ search mode: show ALL matches (no slice)
-    return blogs.filter((b) =>
-      (b.post_title || "").toLowerCase().includes(q)
-    );
+    return blogs.filter((b) => (b.post_title || "").toLowerCase().includes(q));
   }, [blogs, debouncedQuery]);
 
   const handleNavigation = () => setMobileMenuOpen(false);
@@ -253,41 +269,7 @@ const HeaderMenu: React.FC = () => {
                     Storage Solutions
                   </Link>
                 </li>
-                <li className="group/sub relative border-b border-gray-100">
-                  <div className="flex items-center justify-between px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors cursor-pointer">
-                    <span>Commercial Moving</span>
-                    <ChevronDown className="w-4 h-4 transition-transform duration-200 group-hover/sub:rotate-180" />
-                  </div>
-                  <ul className="absolute z-50 left-full top-0 ml-1 w-64 bg-white border border-gray-200 shadow-xl rounded-md opacity-0 group-hover/sub:opacity-100 group-hover/sub:visible transition-all duration-300 ease-in-out invisible">
-                    <li className="border-b border-gray-100">
-                      <Link
-                        href="/services/commercial-moving/office-relocation"
-                        className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                        onClick={handleNavigation}
-                      >
-                        Office Relocation
-                      </Link>
-                    </li>
-                    <li className="border-b border-gray-100">
-                      <Link
-                        href="/services/commercial-moving/retail-relocation"
-                        className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                        onClick={handleNavigation}
-                      >
-                        Retail Relocation
-                      </Link>
-                    </li>
-                    <li>
-                      <Link
-                        href="/services/commercial-moving/corporate-relocation"
-                        className="block px-4 py-3 text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
-                        onClick={handleNavigation}
-                      >
-                        Corporate Relocation
-                      </Link>
-                    </li>
-                  </ul>
-                </li>
+
                 <li className="border-b border-gray-100">
                   <Link
                     href="/services/specialized-moving"
@@ -348,13 +330,10 @@ const HeaderMenu: React.FC = () => {
 
               <div className="absolute z-50 left-1/2 transform -translate-x-1/2 mt-4 w-96 bg-white border border-gray-200 shadow-xl rounded-lg opacity-0 group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-in-out invisible">
                 <div className="p-4">
-                  {/* Total count badge */}
                   <div className="bg-orange-500 inline-flex items-center px-3 py-1 rounded-full text-white text-xs font-semibold">
-                    Total Blogs:{" "}
-                    {loadingBlogs ? "..." : error ? "0" : blogs.length}
+                    Total Blogs: {loadingBlogs ? "..." : error ? "0" : blogs.length}
                   </div>
 
-                  {/* Search */}
                   <div className="mt-3 relative">
                     <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
                       <Search className="w-4 h-4 text-gray-400" />
@@ -368,12 +347,9 @@ const HeaderMenu: React.FC = () => {
                     />
                   </div>
 
-                  {/* Blog list */}
                   <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
                     {error ? (
-                      <p className="text-red-500 text-sm py-2 text-center">
-                        {error}
-                      </p>
+                      <p className="text-red-500 text-sm py-2 text-center">{error}</p>
                     ) : loadingBlogs && blogs.length === 0 ? (
                       Array.from({ length: 5 }).map((_, i) => (
                         <div
@@ -382,29 +358,31 @@ const HeaderMenu: React.FC = () => {
                         />
                       ))
                     ) : filteredBlogs.length > 0 ? (
-                      filteredBlogs.map((item) => (
-                        <Link
-                          key={item.id}
-                          href={`/blogs/${item.id}`}
-                          className="block p-2 rounded-md bg-gray-50 hover:bg-orange-50 border border-transparent hover:border-orange-200 transition-all duration-200 group/item"
-                          onClick={handleNavigation}
-                        >
-                          <span
-                            className="text-sm text-gray-700 group-hover/item:text-orange-600 font-medium line-clamp-2"
-                            dangerouslySetInnerHTML={{
-                              __html: highlightSearchTerm(
-                                item.post_title,
-                                searchQuery
-                              ),
-                            }}
-                          />
-                        </Link>
-                      ))
+                      filteredBlogs.map((item) => {
+                        const slug =
+                          (typeof item.slug === "string" && item.slug.trim())
+                            ? item.slug.trim()
+                            : slugify(item.post_title);
+
+                        return (
+                          <Link
+                            key={item.id}
+                            href={`/${encodeURIComponent(slug)}`} // ✅ ROOT SLUG URL
+                            className="block p-2 rounded-md bg-gray-50 hover:bg-orange-50 border border-transparent hover:border-orange-200 transition-all duration-200 group/item"
+                            onClick={handleNavigation}
+                          >
+                            <span
+                              className="text-sm text-gray-700 group-hover/item:text-orange-600 font-medium line-clamp-2"
+                              dangerouslySetInnerHTML={{
+                                __html: highlightSearchTerm(item.post_title, searchQuery),
+                              }}
+                            />
+                          </Link>
+                        );
+                      })
                     ) : (
                       <p className="text-gray-500 text-sm py-3 text-center">
-                        {searchQuery
-                          ? "No blogs found."
-                          : "No blogs available."}
+                        {searchQuery ? "No blogs found." : "No blogs available."}
                       </p>
                     )}
                   </div>
@@ -441,11 +419,7 @@ const HeaderMenu: React.FC = () => {
             className="p-2 rounded-md text-gray-700 hover:text-orange-500 hover:bg-gray-100 transition-colors duration-200"
             aria-label="Toggle menu"
           >
-            {isMobileMenuOpen ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Menu className="w-6 h-6" />
-            )}
+            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
 
