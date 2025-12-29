@@ -49,10 +49,17 @@ const HeroSection = () => {
       </div>
 
      <div
-          className={`fixed top-[15%] right-[2.52%] z-30 w-[650px] h-[600px] transform transition-all duration-300 ${
-            isScrolling ? "scale-[0.4]" : "scale-[1]"
-          }`}
-          style={{ transformOrigin: "top right" }} // Adjust origin for zoom effect
+          className="bg-transparent shadow-lg
+         pointer-events-auto
+            rounded-2xl border border-black/5
+            overflow-auto
+            max-h-[calc(100vh-7rem)]
+            max-w-[calc(100vw-1.5rem)]
+            w-[320px]
+            md:w-[700px]
+            top-[15%]
+            mt-40"
+          // Adjust origin for zoom effect
         >
           <MovingCalculator />
         </div>
