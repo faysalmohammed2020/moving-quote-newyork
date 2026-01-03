@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import BlogPostClient from "@/app/(main)/blogs/[id]/BlogPostClient";
+import BlogPostClient from '@/app/(main)/blogs/[id]/BlogPostClient';
 
 const SITE_URL_RAW =
-  process.env.NEXT_PUBLIC_BASE_URL ?? "https://movingquotenewyork.com/";
+  process.env.NEXT_PUBLIC_BASE_URL ?? "https://movingquotetexas.com/";
 const SITE_URL = SITE_URL_RAW.replace(/\/$/, "");
 
 function stripHtml(html: string): string {
@@ -32,8 +32,8 @@ export async function generateMetadata(
 
     if (!res.ok) {
       return {
-        title: "Moving Quote New York ",
-        robots: { index: false, follow: false },
+        title: "Moving Quote Texas Blogs",
+        robots: { index: true, follow: true },
         alternates: { canonical },
       };
     }
@@ -41,14 +41,14 @@ export async function generateMetadata(
     const data = await res.json();
 
     const titleRaw = data?.post_title ? String(data.post_title) : "";
-    const title = titleRaw || "Moving Quote New York ";
+    const title = titleRaw || "Moving Quote Texas Blogs";
 
     const desc =
       stripHtml(String(data?.post_content ?? "")).slice(0, 160) ||
-      "Read this article on Moving Quote New York Blog.";
+      "Read this article on Moving Quote Texas Blog.";
 
     return {
-      title: `${title} | Moving Quote New York Blog`,
+      title: `${title}`,
       description: desc,
       alternates: { canonical },
       openGraph: {
@@ -56,7 +56,7 @@ export async function generateMetadata(
         title,
         description: desc,
         url: canonical,
-        siteName: "Moving Quote New York Blog",
+        siteName: "Moving Quote Texas Blog",
       },
       twitter: {
         card: "summary",
@@ -66,7 +66,7 @@ export async function generateMetadata(
     };
   } catch {
     return {
-      title: "Moving Quote New York ",
+      title: "Moving Quote Texas",
       alternates: { canonical },
     };
   }

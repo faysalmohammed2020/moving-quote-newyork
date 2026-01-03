@@ -422,21 +422,24 @@ export async function GET(req: Request) {
     const totalPages = Math.ceil(total / limit) || 1;
     const pageSlice = sortable.slice(skip, skip + limit);
 
-    const paginated = pageSlice.map((item) => {
-      const { readTime, excerpt, imageUrl } = computeMetaFromContent(item.post_content);
+ const paginated = pageSlice.map((item) => {
+  const { readTime, excerpt, imageUrl } = computeMetaFromContent(item.post_content);
 
-      return {
-        id: item.id,
-        post_title: item.post_title,
-        post_category: item.post_category,
-        post_tags: item.post_tags,
-        post_status: item.post_status,
-        createdAt: item.createdAt,
-        imageUrl,
-        excerpt: item.post_excerpt || excerpt,
-        readTime,
-      };
-    });
+  const slug = slugifyServer(item.post_title || "");
+
+  return {
+    id: item.id,
+    slug, // ✅ ADD THIS
+    post_title: item.post_title,
+    post_category: item.post_category,
+    post_tags: item.post_tags,
+    post_status: item.post_status,
+    createdAt: item.createdAt,
+    imageUrl,
+    excerpt: item.post_excerpt || excerpt,
+    readTime,
+  };
+});
 
     return NextResponse.json(
       {

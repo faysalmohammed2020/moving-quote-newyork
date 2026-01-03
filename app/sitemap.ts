@@ -1,31 +1,27 @@
 import type { MetadataRoute } from "next";
 
-type Blog = { id: number; createdAt?: string; updatedAt?: string };
+type Blog = { slug: string; createdAt?: string };
 type BlogResponse = {
   data: Blog[];
-  meta?: { page?: number; limit?: number; total?: number; totalPages?: number };
+  meta?: { totalPages?: number };
 };
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl =
-    process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, "") ||
-    "https://movingquotenewyork.com/";
+    (process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
 
   const staticRoutes = [
     "/",
-    "/home",
-    "/allTestimonials",
-    "/allBlogs",
+    "/about-us/testimonial",
+    "/blog",
     "/contact",
+    "/review",
     "/services/auto-transport",
-    "/services/commercial-moving",
+    "/services/home-changes",
     "/services/long-distance-moving",
-    "/services/small-moves",
-    "/services/specialized-moving",
     "/services/storage-solutions",
   ];
 
-  // ✅ সব blog post id fetch
   const posts = await fetchAllBlogPosts(siteUrl);
 
   const now = new Date();
@@ -39,8 +35,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
 
     ...posts.map((p) => ({
-      url: `${siteUrl}/blog/${p.id}`,
-      lastModified: new Date(p.updatedAt || p.createdAt || now),
+      url: `${siteUrl}/${encodeURIComponent(p.slug)}`, // ✅ slug route
+      lastModified: new Date(p.createdAt || now.toISOString()),
       changeFrequency: "weekly" as const,
       priority: 0.7,
     })),
@@ -48,26 +44,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 }
 
 async function fetchAllBlogPosts(siteUrl: string): Promise<Blog[]> {
-  const limit = 100; // দরকার হলে বাড়ান
+  const limit = 2000;
   let page = 1;
   const all: Blog[] = [];
 
   while (true) {
-    const res = await fetch(
-      `${siteUrl}/api/blogs?page=${page}&limit=${limit}`,
-      { cache: "no-store" }
-    );
+    const res = await fetch(`${siteUrl}/api/blogs?page=${page}&limit=${limit}`, {
+      cache: "no-store",
+    });
 
     if (!res.ok) break;
 
     const json = (await res.json()) as BlogResponse;
 
-    const data = json?.data ?? [];
+    all.push(...(json?.data ?? []));
+
     const totalPages = json?.meta?.totalPages ?? 1;
-
-    all.push(...data);
-
     if (page >= totalPages) break;
+
     page++;
   }
 
