@@ -25,22 +25,30 @@ interface Blog {
   post_content: string;
   post_category: string;
   post_tags: string;
-  createdAt: any;
+  createdAt: string | Date | null;
   imageUrl?: string | null;
   excerpt?: string;
   readTime?: number;
   _searchTitle?: string;
+
+  // ✅ DB field
+  post_status?: "publish" | "draft" | "unpublish" | string;
+
+  // ✅ UI derived
+  isPublished?: boolean;
+}
+
+interface BlogMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 }
 
 interface BlogResponse {
-  data: any[];
-  items?: any[];
-  meta?: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+  data: unknown[];
+  items?: unknown[];
+  meta?: BlogMeta;
 }
 
 /** ✅ normalize any kind of relative image path safely for next/image */
@@ -79,31 +87,27 @@ const getFirstLine = (html: string) => {
   return line;
 };
 
-/* ✅ Skeleton Card (cleaner) */
 const SkeletonCard: React.FC = React.memo(() => (
-  <article className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm animate-pulse">
-    <div className="h-48 bg-gray-200" />
+  <div className="bg-white rounded-2xl overflow-hidden shadow-md border border-gray-100 animate-pulse">
+    <div className="w-full h-48 bg-gray-200" />
     <div className="p-5 space-y-3">
-      <div className="h-3 w-24 bg-gray-200 rounded" />
-      <div className="h-6 w-4/5 bg-gray-200 rounded" />
+      <div className="h-3 w-20 bg-gray-200 rounded" />
+      <div className="h-6 w-3/4 bg-gray-200 rounded" />
       <div className="h-3 w-full bg-gray-200 rounded" />
       <div className="h-3 w-5/6 bg-gray-200 rounded" />
       <div className="h-3 w-2/3 bg-gray-200 rounded" />
-      <div className="pt-3 mt-3 border-t border-gray-100 flex justify-between">
-        <div className="h-3 w-16 bg-gray-200 rounded" />
-        <div className="h-8 w-20 bg-gray-200 rounded-full" />
-      </div>
     </div>
-  </article>
+  </div>
 ));
 SkeletonCard.displayName = "SkeletonCard";
 
-/** ✅ Admin card view (premium like earlier) */
+/** ✅ Admin card view */
 const AdminBlogCard: React.FC<{
   post: Blog;
   onEdit: (b: Blog) => void;
   onDelete: (id: number) => void;
-}> = React.memo(({ post, onEdit, onDelete }) => {
+  onTogglePublish: (id: number, nextPublished: boolean) => void;
+}> = React.memo(({ post, onEdit, onDelete, onTogglePublish }) => {
   const safeImg = normalizeImageUrl(post.imageUrl);
 
   const postDate = useMemo(
@@ -118,78 +122,100 @@ const AdminBlogCard: React.FC<{
     [post.createdAt]
   );
 
+  const status = String(post.post_status ?? "unpublish").toLowerCase().trim();
+  const published = status === "publish";
+
+  const badgeText =
+    status === "publish" ? "Published" : status === "draft" ? "Draft" : "Unpublished";
+
   return (
-    <article className="group bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-md hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex flex-col">
-      {/* Image */}
-      <Link href={`/blog/${post.id}`} className="relative block">
+    <div className="bg-white rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 border border-gray-100 flex flex-col">
+      <Link href={`/blog/${post.id}`} className="group">
         <div className="relative w-full h-48 overflow-hidden">
           <Image
             src={safeImg}
             alt={post.post_title}
             fill
             loading="lazy"
-            className="object-cover group-hover:scale-110 transition-transform duration-700"
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-70" />
-          <div className="absolute left-3 top-3">
-            <span className="text-xs font-semibold uppercase tracking-wider bg-white/90 text-indigo-700 px-3 py-1 rounded-full shadow-sm">
-              {post.post_category || "Uncategorized"}
-            </span>
-          </div>
         </div>
       </Link>
 
-      {/* Content */}
       <div className="p-6 flex flex-col flex-1">
-        <h2 className="text-lg md:text-xl font-bold text-gray-900 leading-tight mb-2 line-clamp-2 group-hover:text-indigo-600 transition-colors">
+        <span className="text-xs font-semibold uppercase text-indigo-600 tracking-widest mb-2">
+          {post.post_category || "Uncategorized"}
+        </span>
+
+        <h2 className="text-xl font-bold text-gray-900 leading-tight mb-2 line-clamp-2">
           {post.post_title}
         </h2>
 
-        <p className="text-gray-600 text-sm md:text-base line-clamp-3 flex-1 leading-relaxed">
-          {post.excerpt || "—"}
-        </p>
+        <p className="text-gray-600 line-clamp-3 flex-1">{post.excerpt || "—"}</p>
 
-        {/* Meta */}
-        <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs md:text-sm text-gray-500">
-          <span className="inline-flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            {postDate}
-          </span>
+        <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
+          <span>{postDate}</span>
           <span>{post.readTime || 1} min read</span>
         </div>
 
-        {/* Actions */}
-        <div className="mt-4 flex gap-2">
+        {/* ✅ Status badge */}
+        <div className="mt-3">
+          <span
+            className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
+              published ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
+            }`}
+          >
+            {badgeText}
+          </span>
+        </div>
+
+        <div className="mt-4 flex gap-2 flex-wrap">
           <button
             onClick={() => onEdit(post)}
-            className="flex-1 px-3 py-2 text-sm font-semibold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-sm"
+            className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
           >
             Edit
           </button>
+
+          {/* ✅ Toggle publish <-> unpublish */}
+          <button
+            onClick={() => onTogglePublish(post.id, !published)}
+            className={`px-3 py-2 text-sm text-white rounded-lg ${
+              published ? "bg-orange-600 hover:bg-orange-700" : "bg-green-600 hover:bg-green-700"
+            }`}
+          >
+            {published ? "Unpublish" : "Publish"}
+          </button>
+
           <button
             onClick={() => onDelete(post.id)}
-            className="flex-1 px-3 py-2 text-sm font-semibold bg-red-600 text-white rounded-xl hover:bg-red-700 transition shadow-sm"
+            className="px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
           >
             Delete
           </button>
         </div>
       </div>
-    </article>
+    </div>
   );
 });
 AdminBlogCard.displayName = "AdminBlogCard";
 
+// ✅ AbortError checker
+function isAbortError(err: unknown) {
+  return err instanceof DOMException && err.name === "AbortError";
+}
+
 const BlogManagementClient: React.FC<{
-  initialBlogs: any[];
+  initialBlogs: unknown[];
   initialMeta: NonNullable<BlogResponse["meta"]>;
   itemsPerPage: number; // 9
 }> = ({ initialBlogs, initialMeta, itemsPerPage }) => {
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [editBlogData, setEditBlogData] = useState<Blog | null>(null);
+
   const [searchQuery, setSearchQuery] = useState("");
 
-  /** ✅ server-side pagination states */
   const [currentPage, setCurrentPage] = useState(initialMeta.page || 1);
   const [totalPages, setTotalPages] = useState(initialMeta.totalPages || 1);
   const [totalBlogs, setTotalBlogs] = useState(initialMeta.total || 0);
@@ -203,16 +229,17 @@ const BlogManagementClient: React.FC<{
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  /** ✅ force reload token */
   const [reloadTick, setReloadTick] = useState(0);
   const forceReload = useCallback(() => setReloadTick((t) => t + 1), []);
 
-  /** ✅ only skip fetch on VERY first mount */
   const didSkipInitial = useRef(false);
 
-  /** ✅ Fetch one page from server */
   useEffect(() => {
-    if (!didSkipInitial.current && currentPage === initialMeta.page) {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (!didSkipInitial.current && currentPage === initialMeta.page && !searchQuery) {
       didSkipInitial.current = true;
       return;
     }
@@ -224,26 +251,32 @@ const BlogManagementClient: React.FC<{
       setPageLoading(true);
 
       try {
-        const res = await fetch(
-          `/api/blogs?page=${currentPage}&limit=${itemsPerPage}`,
-          { signal: controller.signal, cache: "no-store" }
-        );
+        const qs = new URLSearchParams();
+        qs.set("page", String(currentPage));
+        qs.set("limit", String(itemsPerPage));
+        if (searchQuery.trim()) qs.set("q", searchQuery.trim());
+
+        const res = await fetch(`/api/blogs?${qs.toString()}`, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
+
         if (!res.ok) throw new Error("Failed to fetch blogs");
 
-        const json: BlogResponse | any = await res.json();
+        const json: unknown = await res.json();
 
-        const list: any[] = Array.isArray(json)
+        const list: unknown[] = Array.isArray(json)
           ? json
-          : json.data || json.items || [];
+          : (json as BlogResponse).data || (json as BlogResponse).items || [];
 
-        const meta = Array.isArray(json)
+        const meta: BlogMeta = Array.isArray(json)
           ? {
               page: currentPage,
               limit: itemsPerPage,
               total: list.length,
               totalPages: Math.max(1, Math.ceil(list.length / itemsPerPage)),
             }
-          : json.meta || {
+          : (json as BlogResponse).meta || {
               page: currentPage,
               limit: itemsPerPage,
               total: list.length,
@@ -257,14 +290,8 @@ const BlogManagementClient: React.FC<{
           setTotalPages(meta.totalPages || 1);
           setTotalBlogs(meta.total || mapped.length);
         });
-
-        if (currentPage < (meta.totalPages || 1)) {
-          fetch(`/api/blogs?page=${currentPage + 1}&limit=${itemsPerPage}`, {
-            cache: "no-store",
-          }).catch(() => {});
-        }
-      } catch (e: any) {
-        if (e.name !== "AbortError") {
+      } catch (e: unknown) {
+        if (!isAbortError(e)) {
           console.error(e);
           setError("Failed to fetch blogs. Please try again later.");
         }
@@ -275,9 +302,8 @@ const BlogManagementClient: React.FC<{
 
     fetchPageBlogs();
     return () => controller.abort();
-  }, [currentPage, itemsPerPage, reloadTick, initialMeta.page]);
+  }, [currentPage, itemsPerPage, reloadTick, initialMeta.page, searchQuery]);
 
-  /** ✅ Search filter (current page) */
   const filteredPosts = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return blogs;
@@ -292,11 +318,9 @@ const BlogManagementClient: React.FC<{
   const handleEditClick = useCallback(async (blog: Blog) => {
     if (!blog.post_content) {
       try {
-        const res = await fetch(`/api/blogs?id=${blog.id}`, {
-          cache: "no-store",
-        });
+        const res = await fetch(`/api/blogs?id=${blog.id}`, { cache: "no-store" });
         if (res.ok) {
-          const full = await res.json();
+          const full: unknown = await res.json();
           blog = mapApiToBlog(full);
         }
       } catch {}
@@ -307,8 +331,7 @@ const BlogManagementClient: React.FC<{
 
   const handleDeleteClick = useCallback(
     async (id: number) => {
-      if (!window.confirm("Are you sure you want to delete this blog post?"))
-        return;
+      if (!window.confirm("Are you sure you want to delete this blog post?")) return;
 
       setBlogs((prev) => prev.filter((b) => b.id !== id)); // optimistic
 
@@ -325,6 +348,58 @@ const BlogManagementClient: React.FC<{
       } catch {
         alert("Failed to delete blog post. Please try again.");
         forceReload();
+      }
+    },
+    [forceReload]
+  );
+
+  /** ✅ publish/unpublish -> SAVE to DB field post_status */
+  const handleTogglePublish = useCallback(
+    async (id: number, nextPublished: boolean) => {
+      const nextStatus: Blog["post_status"] = nextPublished ? "publish" : "unpublish";
+
+      // optimistic UI
+      setBlogs((prev) =>
+        prev.map((b) =>
+          b.id === id ? { ...b, post_status: nextStatus, isPublished: nextPublished } : b
+        )
+      );
+
+      try {
+        const res = await fetch("/api/blogs", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, post_status: nextStatus }),
+        });
+
+        const payload = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          console.error("PUT failed:", res.status, payload);
+          throw new Error(payload?.error || "Failed to update status");
+        }
+
+        // server/DB truth -> UI sync
+        if (payload) {
+          const mapped = mapApiToBlog(payload);
+          setBlogs((prev) => prev.map((b) => (b.id === id ? mapped : b)));
+        } else {
+          forceReload();
+        }
+      } catch (e) {
+        // rollback
+        setBlogs((prev) =>
+          prev.map((b) =>
+            b.id === id
+              ? {
+                  ...b,
+                  post_status: nextPublished ? "unpublish" : "publish",
+                  isPublished: !nextPublished,
+                }
+              : b
+          )
+        );
+        alert("DB update failed. Please try again.");
       }
     },
     [forceReload]
@@ -351,96 +426,64 @@ const BlogManagementClient: React.FC<{
 
   const getPageNumbers = () => {
     const maxVisiblePages = 3;
-    if (totalPages <= 6)
-      return Array.from({ length: totalPages }, (_, i) => i + 1);
-    if (currentPage <= maxVisiblePages)
-      return [1, 2, 3, "...", totalPages];
+    if (totalPages <= 6) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (currentPage <= maxVisiblePages) return [1, 2, 3, "...", totalPages];
     if (currentPage > totalPages - maxVisiblePages)
       return [1, "...", totalPages - 2, totalPages - 1, totalPages];
-    return [
-      1,
-      "...",
-      currentPage - 1,
-      currentPage,
-      currentPage + 1,
-      "...",
-      totalPages,
-    ];
+    return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
   };
 
   if (error) {
     return (
-      <div className="py-16 text-center">
-        <p className="text-red-500 font-semibold">
-          Failed to fetch blogs. Please try again later.
-        </p>
-      </div>
+      <p className="text-center text-red-500">
+        Failed to fetch blogs. Please try again later.
+      </p>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 md:p-10">
-      {/* ✅ Header (premium) */}
-      <header className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8 mb-8 flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900">
-            Blog Management
-          </h1>
-          <p className="text-gray-500 mt-1 text-sm md:text-base">
-            Manage your blog posts easily from here.
-          </p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search by title…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full sm:w-72 pl-10 pr-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-            />
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-              🔍
-            </span>
-          </div>
-
+    <div className="p-6 bg-gray-100 min-h-screen font-sans">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+        <h1 className="text-3xl font-bold">Blog Management</h1>
+        <div className="flex gap-3">
+          <input
+            type="text"
+            placeholder="Search title..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-64 border border-slate-400 p-2 rounded-lg"
+          />
           <button
             onClick={handleCreateNewClick}
-            className="inline-flex items-center justify-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition shadow-sm"
+            className="text-lg font-bold bg-blue-500 px-4 py-2 text-white rounded-xl"
           >
-            + Create New
+            Create New +
           </button>
-        </div>
-      </header>
-
-      {/* ✅ Progress bar */}
-      {(pageLoading || isPending) && (
-        <div className="w-full h-1.5 bg-gray-200 rounded-full mb-6 overflow-hidden">
-          <div className="h-full w-1/3 bg-indigo-600 animate-pulse rounded-full" />
-        </div>
-      )}
-
-      {/* ✅ Info row */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6">
-        <h2 className="text-lg md:text-xl font-bold text-gray-800">
-          Total Blogs:{" "}
-          <span className="text-indigo-600">{totalBlogs}</span>
-        </h2>
-        <div className="text-sm text-gray-500">
-          Page <span className="font-semibold">{currentPage}</span> of{" "}
-          <span className="font-semibold">{totalPages}</span>
         </div>
       </div>
 
-      {/* ✅ Cards Grid */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
+      <hr />
+
+      {(pageLoading || isPending) && (
+        <div className="w-full h-1 bg-gray-200 rounded my-4 overflow-hidden">
+          <div className="h-full w-1/3 bg-indigo-500 animate-pulse" />
+        </div>
+      )}
+
+      <div className="flex justify-between items-center mt-4 mb-4">
+        <h2 className="text-xl font-bold">
+          Our Blogs: <span className="text-cyan-600">{totalBlogs}</span>
+        </h2>
+        <span className="text-sm text-slate-500">
+          Page {currentPage} of {totalPages}
+        </span>
+      </div>
+
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {pageLoading && blogs.length === 0 ? (
-          Array.from({ length: itemsPerPage }).map((_, i) => (
-            <SkeletonCard key={i} />
-          ))
+          Array.from({ length: itemsPerPage }).map((_, i) => <SkeletonCard key={i} />)
         ) : filteredPosts.length === 0 ? (
-          <div className="col-span-full text-center text-gray-500 py-14 bg-white rounded-xl border">
+          <div className="col-span-full text-center text-gray-500 py-10">
             No posts found.
           </div>
         ) : (
@@ -450,61 +493,54 @@ const BlogManagementClient: React.FC<{
               post={post}
               onEdit={handleEditClick}
               onDelete={handleDeleteClick}
+              onTogglePublish={handleTogglePublish}
             />
           ))
         )}
       </section>
 
-      {/* ✅ Pagination (premium compact) */}
       {totalPages > 1 && (
-        <div className="flex justify-center mt-12">
-          <nav className="flex flex-wrap items-center gap-1 bg-white border border-gray-100 shadow-md rounded-2xl p-2">
+        <div className="flex justify-center mt-14">
+          <nav className="flex space-x-1 p-2 bg-white rounded-xl shadow-lg border border-gray-200">
             <button
               onClick={() => paginate(currentPage - 1)}
               disabled={currentPage === 1}
-              className={`px-4 py-2 text-sm font-semibold rounded-xl transition
-                ${
-                  currentPage === 1
-                    ? "text-gray-400 bg-gray-50 cursor-not-allowed"
-                    : "text-gray-700 hover:bg-gray-50"
-                }`}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
+                currentPage === 1
+                  ? "text-gray-400 cursor-not-allowed"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
             >
               ← Prev
             </button>
 
-            {getPageNumbers().map((page, index) =>
-              page === "..." ? (
-                <span
-                  key={`dots-${index}`}
-                  className="px-3 py-2 text-gray-400 text-sm"
-                >
-                  ...
-                </span>
-              ) : (
-                <button
-                  key={page as number}
-                  onClick={() => paginate(Number(page))}
-                  className={`min-w-[40px] px-4 py-2 text-sm font-semibold rounded-xl transition
-                    ${
+            {getPageNumbers().map((page, index) => (
+              <div key={index}>
+                {page === "..." ? (
+                  <span className="px-4 py-2 text-gray-500">...</span>
+                ) : (
+                  <button
+                    onClick={() => paginate(Number(page))}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
                       currentPage === page
-                        ? "bg-indigo-600 text-white shadow hover:bg-indigo-700"
-                        : "text-gray-700 hover:bg-gray-50"
+                        ? "bg-indigo-600 text-white shadow-md hover:bg-indigo-700"
+                        : "text-gray-700 hover:bg-gray-100"
                     }`}
-                >
-                  {page}
-                </button>
-              )
-            )}
+                  >
+                    {page}
+                  </button>
+                )}
+              </div>
+            ))}
 
             <button
               onClick={() => paginate(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className={`px-4 py-2 text-sm font-semibold rounded-xl transition
-                ${
-                  currentPage === totalPages
-                    ? "text-gray-400 bg-gray-50 cursor-not-allowed"
-                    : "text-gray-700 hover:bg-gray-50"
-                }`}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
+                currentPage === totalPages
+                  ? "text-gray-400 cursor-not-allowed"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
             >
               Next →
             </button>
@@ -512,35 +548,27 @@ const BlogManagementClient: React.FC<{
         </div>
       )}
 
-      {/* ✅ Modal (same logic, nicer shell) */}
       {isFormVisible && (
         <div
-          className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4"
+          className="fixed inset-0 bg-gray-500 bg-opacity-70 flex justify-center items-center z-50"
           role="dialog"
           aria-modal="true"
           onClick={handleCloseModal}
         >
           <div
-            className="bg-white rounded-2xl p-6 md:p-8 w-full max-w-4xl shadow-2xl overflow-y-auto max-h-[92vh]"
+            className="bg-white rounded-xl p-8 w-11/12 max-w-4xl shadow-lg overflow-y-auto max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-5">
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900">
+            <div className="flex justify-between mb-2">
+              <h2 className="text-2xl font-bold">
                 {editBlogData ? "Edit Blog" : "Create New Blog"}
               </h2>
-              <button
-                onClick={handleCloseModal}
-                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 text-xl font-bold transition"
-              >
-                ×
+              <button onClick={handleCloseModal} className="text-gray-500 font-bold text-xl">
+                &times;
               </button>
             </div>
 
-            <Suspense
-              fallback={
-                <div className="h-40 bg-gray-100 rounded-xl animate-pulse" />
-              }
-            >
+            <Suspense fallback={<div className="h-40 bg-gray-100 rounded-xl animate-pulse" />}>
               <BlogPostForm
                 initialData={editBlogData}
                 onClose={handleCloseModal}
@@ -557,31 +585,36 @@ const BlogManagementClient: React.FC<{
 export default BlogManagementClient;
 
 /** ---------- helpers ---------- */
-function mapApiToBlog(item: any): Blog {
-  const rawContent =
-    typeof item.post_content === "object" && item.post_content?.text
-      ? item.post_content.text
-      : String(item.post_content ?? "");
+function mapApiToBlog(item: unknown): Blog {
+  const obj = (item ?? {}) as Record<string, unknown>;
 
-  const title = String(item.post_title || "");
+  const rawPostContent = obj.post_content;
+  const rawContent =
+    typeof rawPostContent === "object" &&
+    rawPostContent !== null &&
+    "text" in rawPostContent
+      ? String((rawPostContent as { text?: unknown }).text ?? "")
+      : String(rawPostContent ?? "");
+
+  const title = String(obj.post_title || "");
 
   const apiImage =
-    item.imageUrl ||
-    item.image_url ||
-    item.thumbnail ||
-    item.thumbnailUrl ||
-    item.thumbnail_url ||
-    item.post_thumbnail ||
-    item.post_image ||
-    item.featured_image ||
-    item.featuredImage ||
-    item.cover_image ||
-    item.banner ||
-    item.image ||
+    obj.imageUrl ||
+    obj.image_url ||
+    obj.thumbnail ||
+    obj.thumbnailUrl ||
+    obj.thumbnail_url ||
+    obj.post_thumbnail ||
+    obj.post_image ||
+    obj.featured_image ||
+    obj.featuredImage ||
+    obj.cover_image ||
+    obj.banner ||
+    obj.image ||
     null;
 
   const contentImage = extractFirstImage(rawContent);
-  const imageUrl = apiImage || contentImage || null;
+  const imageUrl = (apiImage as string | null) || contentImage || null;
 
   const firstLine = getFirstLine(rawContent);
   const excerpt = firstLine.slice(0, 160);
@@ -589,16 +622,22 @@ function mapApiToBlog(item: any): Blog {
   const wordCount = rawContent.split(/\s+/).filter(Boolean).length;
   const readTime = Math.max(1, Math.ceil(wordCount / 200));
 
+  // ✅ IMPORTANT: DB uses "publish" not "published"
+  const status = String(obj.post_status ?? "unpublish").toLowerCase().trim();
+  const isPublished = status === "publish";
+
   return {
-    id: Number(item.id),
+    id: Number(obj.id),
     post_title: title,
     post_content: rawContent,
-    post_category: item.post_category || item.category || "",
-    post_tags: item.post_tags || item.tags || "",
-    createdAt: item.createdAt ?? item.post_date ?? null,
+    post_category: String(obj.post_category || obj.category || ""),
+    post_tags: String(obj.post_tags || obj.tags || ""),
+    createdAt: (obj.createdAt ?? obj.post_date ?? null) as string | Date | null,
     imageUrl,
     excerpt,
     readTime,
     _searchTitle: title.toLowerCase().trim(),
+    post_status: status,
+    isPublished,
   };
 }

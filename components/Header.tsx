@@ -7,7 +7,12 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "@/lib/auth-client";
 
-type BlogLite = { id: number; post_title: string; slug?: string };
+type BlogLite = {
+  id: number;
+  post_title: string;
+  slug?: string;
+  post_status?: string; // ✅ need for filtering
+};
 
 const API_URL = "/api/blogs";
 
@@ -29,6 +34,10 @@ function slugify(input: string) {
     .replace(/^-+|-+$/g, "")
     .slice(0, 120);
 }
+
+// ✅ ONLY publish
+const isPublished = (status: unknown) =>
+  String(status || "").toLowerCase().trim() === "publish";
 
 // ---- safe highlight
 const highlightSearchTerm = (text: string, query: string): string => {
@@ -57,6 +66,14 @@ function useDebouncedValue<T>(value: T, delay = 250) {
   }, [value, delay]);
   return debounced;
 }
+
+type TitlesApiRow = {
+  id?: unknown;
+  post_title?: unknown;
+  post_name?: unknown;
+  slug?: unknown;
+  post_status?: unknown;
+};
 
 const HeaderMenu: React.FC = () => {
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -105,7 +122,7 @@ const HeaderMenu: React.FC = () => {
     } catch {}
   }, []);
 
-  // ✅ fetch ALL titles
+  // ✅ fetch ALL titles (keep status, filter later safely)
   const fetchBlogsTitles = useCallback(async (signal?: AbortSignal) => {
     const res = await fetch(`${API_URL}?titles=1`, {
       cache: "no-store",
@@ -115,24 +132,29 @@ const HeaderMenu: React.FC = () => {
 
     if (!res.ok) throw new Error(`Failed to load blogs: ${res.status}`);
 
-    const rows = (await res.json()) as any[];
+    const raw = (await res.json()) as unknown;
 
-    const rawList = (Array.isArray(rows) ? rows : rows?.data || []) as any[];
+    const rawList: TitlesApiRow[] = Array.isArray(raw)
+      ? (raw as TitlesApiRow[])
+      : [];
 
     const list: BlogLite[] = rawList
       .map((r) => {
-        const title = String(r?.post_title || r?.post_name || "");
+        const title = String(r?.post_title ?? r?.post_name ?? "").trim();
+
         const apiSlug =
-          typeof r?.slug === "string" && String(r.slug).trim()
-            ? String(r.slug).trim()
-            : "";
+          typeof r?.slug === "string" && r.slug.trim() ? r.slug.trim() : "";
 
         const finalSlug = apiSlug || slugify(title);
+
+        const status =
+          typeof r?.post_status === "string" ? r.post_status.trim() : "";
 
         return {
           id: Number(r?.id),
           post_title: title,
           slug: finalSlug,
+          post_status: status, // ✅ IMPORTANT
         };
       })
       .filter((b) => b.id && b.post_title);
@@ -149,8 +171,14 @@ const HeaderMenu: React.FC = () => {
       setError(null);
 
       const { cached, fresh } = loadFromCache();
-      if (cached && mounted) {
-        setBlogs(cached);
+
+      // ✅ cache থেকেও unpublish বাদ (IMPORTANT)
+      const cachedPublishedOnly = (cached || []).filter((b) =>
+        isPublished(b.post_status)
+      );
+
+      if (cachedPublishedOnly.length && mounted) {
+        setBlogs(cachedPublishedOnly);
       }
 
       if (!fresh) setLoadingBlogs(true);
@@ -159,12 +187,17 @@ const HeaderMenu: React.FC = () => {
         const list = await fetchBlogsTitles(controller.signal);
         if (!mounted) return;
 
-        setBlogs(list);
-        saveCache(list);
+        // ✅ API list থেকেও unpublish বাদ
+        const publishedOnly = list.filter((b) => isPublished(b.post_status));
+
+        setBlogs(publishedOnly);
+
+        // ✅ cache এও published-only save করো যাতে পরে unpublish না আসে
+        saveCache(publishedOnly);
       } catch (err) {
         if (!mounted) return;
 
-        if (!cached?.length) {
+        if (!cachedPublishedOnly.length) {
           setError(err instanceof Error ? err.message : "Failed to load blogs");
         }
         console.error("Error fetching blogs:", err);
@@ -181,13 +214,16 @@ const HeaderMenu: React.FC = () => {
     };
   }, [fetchBlogsTitles, loadFromCache, saveCache]);
 
-  // ✅ filter
+  // ✅ filter (blogs already publish-only, this is only search)
   const filteredBlogs = useMemo(() => {
     const q = debouncedQuery.trim().toLowerCase();
 
-    if (!q) return blogs.slice(0, 10);
+    const base = blogs; // ✅ already publish-only
+    if (!q) return base.slice(0, 10);
 
-    return blogs.filter((b) => (b.post_title || "").toLowerCase().includes(q));
+    return base
+      .filter((b) => (b.post_title || "").toLowerCase().includes(q))
+      .slice(0, 10);
   }, [blogs, debouncedQuery]);
 
   const handleNavigation = () => setMobileMenuOpen(false);
@@ -227,7 +263,7 @@ const HeaderMenu: React.FC = () => {
           <ul className="flex items-center space-x-4 xl:space-x-6 text-base xl:text-lg">
             <li>
               <Link
-                href="/home"
+                href="/"
                 className="hover:text-orange-400 transition-colors duration-200 font-medium"
                 onClick={handleNavigation}
               >
@@ -331,7 +367,8 @@ const HeaderMenu: React.FC = () => {
               <div className="absolute z-50 left-1/2 transform -translate-x-1/2 mt-4 w-96 bg-white border border-gray-200 shadow-xl rounded-lg opacity-0 group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-in-out invisible">
                 <div className="p-4">
                   <div className="bg-orange-500 inline-flex items-center px-3 py-1 rounded-full text-white text-xs font-semibold">
-                    Total Blogs: {loadingBlogs ? "..." : error ? "0" : blogs.length}
+                    Total Blogs:{" "}
+                    {loadingBlogs ? "..." : error ? "0" : blogs.length}
                   </div>
 
                   <div className="mt-3 relative">
@@ -349,7 +386,9 @@ const HeaderMenu: React.FC = () => {
 
                   <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
                     {error ? (
-                      <p className="text-red-500 text-sm py-2 text-center">{error}</p>
+                      <p className="text-red-500 text-sm py-2 text-center">
+                        {error}
+                      </p>
                     ) : loadingBlogs && blogs.length === 0 ? (
                       Array.from({ length: 5 }).map((_, i) => (
                         <div
@@ -360,7 +399,7 @@ const HeaderMenu: React.FC = () => {
                     ) : filteredBlogs.length > 0 ? (
                       filteredBlogs.map((item) => {
                         const slug =
-                          (typeof item.slug === "string" && item.slug.trim())
+                          typeof item.slug === "string" && item.slug.trim()
                             ? item.slug.trim()
                             : slugify(item.post_title);
 
@@ -374,7 +413,10 @@ const HeaderMenu: React.FC = () => {
                             <span
                               className="text-sm text-gray-700 group-hover/item:text-orange-600 font-medium line-clamp-2"
                               dangerouslySetInnerHTML={{
-                                __html: highlightSearchTerm(item.post_title, searchQuery),
+                                __html: highlightSearchTerm(
+                                  item.post_title,
+                                  searchQuery
+                                ),
                               }}
                             />
                           </Link>
@@ -419,7 +461,11 @@ const HeaderMenu: React.FC = () => {
             className="p-2 rounded-md text-gray-700 hover:text-orange-500 hover:bg-gray-100 transition-colors duration-200"
             aria-label="Toggle menu"
           >
-            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            {isMobileMenuOpen ? (
+              <X className="w-6 h-6" />
+            ) : (
+              <Menu className="w-6 h-6" />
+            )}
           </button>
         </div>
 

@@ -232,7 +232,7 @@ export async function GET(req: Request) {
       // 2) Fallback scan (titles only) then fetch by id
       // We avoid fetching post_content for all rows
       const titles = await prisma.blogPost.findMany({
-        select: { id: true, post_title: true },
+        select: { id: true, post_title: true, post_status: true},
         orderBy: { createdAt: "desc" },
       });
 
@@ -339,7 +339,7 @@ export async function GET(req: Request) {
     const titlesOnly = searchParams.get("titles");
     if (titlesOnly === "1") {
       const titles = await prisma.blogPost.findMany({
-        select: { id: true, post_title: true, createdAt: true },
+        select: { id: true, post_title: true, post_status: true, createdAt: true},
         orderBy: { createdAt: "desc" },
       });
 

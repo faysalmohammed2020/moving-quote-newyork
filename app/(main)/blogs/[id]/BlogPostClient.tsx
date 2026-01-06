@@ -434,7 +434,7 @@ export default function BlogPostClient({ slug }: { slug: string }) {
   return (
     <>
       <Head>
-        <title>{`${title} | Moving Quote New York Blog`}</title>
+        <title>{`${title}`}</title>
         <meta name="description" content={description} />
         {keywords && <meta name="keywords" content={keywords} />}
         <link rel="canonical" href={canonical} />

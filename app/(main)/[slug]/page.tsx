@@ -41,11 +41,11 @@ export async function generateMetadata(
     const data = await res.json();
 
     const titleRaw = data?.post_title ? String(data.post_title) : "";
-    const title = titleRaw || "Moving Quote Texas Blogs";
+    const title = titleRaw || "Moving Quote New York Blogs";
 
     const desc =
       stripHtml(String(data?.post_content ?? "")).slice(0, 160) ||
-      "Read this article on Moving Quote Texas Blog.";
+      "Read this article on Moving Quote New York Blog.";
 
     return {
       title: `${title}`,
@@ -56,7 +56,7 @@ export async function generateMetadata(
         title,
         description: desc,
         url: canonical,
-        siteName: "Moving Quote Texas Blog",
+        siteName: "Moving Quote New York Blog",
       },
       twitter: {
         card: "summary",
@@ -66,7 +66,7 @@ export async function generateMetadata(
     };
   } catch {
     return {
-      title: "Moving Quote Texas",
+      title: "Moving Quote New York",
       alternates: { canonical },
     };
   }

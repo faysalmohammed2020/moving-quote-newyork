@@ -64,8 +64,20 @@ type BlogCard = {
   post_content?: string;
   imageUrl?: string;
   slug?: string; // ✅ if API provides
+  post_status?: string; // ✅ add for publish-only
+  image?: unknown;
+  post_image?: unknown;
+  thumbnail?: unknown;
   [key: string]: unknown;
 };
+
+// ✅ publish-only checker
+const isPublish = (status: unknown) =>
+  String(status || "").toLowerCase().trim() === "publish";
+
+// ✅ AbortError checker
+const isAbortError = (err: unknown) =>
+  err instanceof DOMException && err.name === "AbortError";
 
 const BlogSection = () => {
   const [blogCards, setBlogCards] = useState<BlogCard[]>([]);
@@ -85,16 +97,22 @@ const BlogSection = () => {
 
         if (!res.ok) throw new Error("Failed to fetch blogs");
 
-        const json = await res.json();
-        const data: BlogCard[] = Array.isArray(json?.data) ? json.data : [];
+        const json: unknown = await res.json();
+
+        const data: BlogCard[] = Array.isArray((json as any)?.data)
+          ? ((json as any).data as BlogCard[])
+          : [];
+
+        // ✅ ONLY publish posts
+        const publishOnly = data.filter((b) => isPublish(b?.post_status));
 
         // ✅ prefer API image, fallback to first image from content
-        const processedData = data.slice(0, 3).map((blog) => {
+        const processedData = publishOnly.slice(0, 3).map((blog) => {
           const apiImg =
-            (blog as any).imageUrl ||
-            (blog as any).image ||
-            (blog as any).post_image ||
-            (blog as any).thumbnail;
+            blog.imageUrl ??
+            (typeof blog.image === "string" ? blog.image : undefined) ??
+            (typeof blog.post_image === "string" ? blog.post_image : undefined) ??
+            (typeof blog.thumbnail === "string" ? blog.thumbnail : undefined);
 
           const title = String(blog?.post_title ?? "");
           const derivedSlug =
@@ -102,18 +120,19 @@ const BlogSection = () => {
               ? blog.slug.trim()
               : slugify(title);
 
+          const content = String(blog?.post_content ?? "");
+          const fallbackImg = extractFirstImage(content);
+
           return {
             ...blog,
             slug: derivedSlug,
-            imageUrl: normalizeImageUrl(
-              String(apiImg || extractFirstImage(String(blog?.post_content ?? "")))
-            ),
+            imageUrl: normalizeImageUrl(String(apiImg || fallbackImg)),
           };
         });
 
         setBlogCards(processedData);
-      } catch (err: any) {
-        if (err?.name !== "AbortError") {
+      } catch (err: unknown) {
+        if (!isAbortError(err)) {
           setBlogCards([]); // ensure empty state
         }
       } finally {
@@ -173,7 +192,6 @@ const BlogSection = () => {
                 key={index}
                 className="border border-gray-700 bg-gray-900 p-6 text-center shadow-lg rounded-lg hover:shadow-xl transition-shadow duration-300"
               >
-                {/* ✅ Blog image showing */}
                 <img
                   src={String(blog.imageUrl ?? "")}
                   alt={title}
@@ -185,12 +203,10 @@ const BlogSection = () => {
                   {title}
                 </h3>
 
-                {/* ✅ First 200 words from content */}
                 <div className="text-white text-lg leading-7">
                   {getFirstWords(content, 200)}...
                 </div>
 
-                {/* ✅ slug based route: /:slug */}
                 <Link
                   href={`/${encodeURIComponent(slug)}`}
                   className="mt-5 inline-block bg-yellow-500 text-black px-4 py-2 rounded-full hover:bg-yellow-600 transition-colors"
