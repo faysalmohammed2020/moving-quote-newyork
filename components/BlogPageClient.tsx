@@ -284,12 +284,24 @@ export default function BlogPageClient({
           </div>
         )}
 
+        {/* ✅ Blogs Grid + Empty State */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
-          {blogs.length === 0 && pageLoading
-            ? Array.from({ length: postsPerPage }).map((_, i) => (
+          {blogs.length === 0 ? (
+            pageLoading || isPending ? (
+              Array.from({ length: postsPerPage }).map((_, i) => (
                 <BlogCardSkeleton key={i} />
               ))
-            : blogs.map((post) => <BlogCard key={post.id} post={post} />)}
+            ) : (
+              <div className="col-span-full">
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-10 text-center">
+                  <p className="text-2xl font-bold text-gray-900">No blogs found</p>
+                  <p className="mt-2 text-gray-600">Please check back later.</p>
+                </div>
+              </div>
+            )
+          ) : (
+            blogs.map((post) => <BlogCard key={post.id} post={post} />)
+          )}
         </div>
 
         {totalPages > 1 && (
