@@ -1,4 +1,28 @@
 import { Mail, Phone, MapPin } from "lucide-react";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Contact Moving Quote New York | Get a Free Moving Quote",
+  description:
+    "Contact Moving Quote New York for quick, no-obligation moving quotes. Call +1 888 202 1370 or email info@moving-quote-newyork.com for NYC, statewide, and long-distance moves—plus packing, storage, and auto transport.",
+  alternates: {
+    canonical: "https://movingquotenewyork.com/contacts",
+  },
+  openGraph: {
+    title: "Contact Moving Quote New York | Get a Free Moving Quote",
+    description:
+      "Reach out for a fast New York moving quote. Get help with NYC moves, statewide relocations, and long-distance planning—plus packing and storage.",
+    url: "https://movingquotenewyork.com/contacts",
+    siteName: "Moving Quote New York",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Contact Moving Quote New York",
+    description:
+      "Get a free New York moving quote. Call +1 123 456 7890 or email info@movingquotenewyork.com.",
+  },
+};
 
 const ContactPage: React.FC = () => {
   return (
@@ -76,7 +100,7 @@ const ContactPage: React.FC = () => {
                 <Mail className="w-6 h-6 text-orange-500" />
                 <div>
                   <p className="text-lg font-medium">Email</p>
-                  <p className="text-gray-400">info@example.com</p>
+                  <p className="text-gray-400">info@movingquotenewyork.com</p>
                 </div>
               </div>
               <div className="flex items-center space-x-4">
