@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-type Blog = { slug: string; createdAt?: string };
+type Blog = { slug: string; createdAt?: string; post_status?: string };
 type BlogResponse = {
   data: Blog[];
   meta?: { totalPages?: number };
@@ -8,7 +8,7 @@ type BlogResponse = {
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl =
-    (process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
+    (process.env.NEXT_PUBLIC_BASE_URL || "https://movingquotenewyork.com/").replace(/\/$/, "");
 
   const staticRoutes = [
     "/",
@@ -24,6 +24,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const posts = await fetchAllBlogPosts(siteUrl);
 
+  // ✅ Only published
+  const publishedPosts = posts.filter(
+    (p) => String(p.post_status ?? "").toLowerCase().trim() === "publish"
+  );
+
   const now = new Date();
 
   return [
@@ -34,8 +39,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: path === "/" ? 1 : 0.8,
     })),
 
-    ...posts.map((p) => ({
-      url: `${siteUrl}/${encodeURIComponent(p.slug)}`, // ✅ slug route
+    ...publishedPosts.map((p) => ({
+      url: `${siteUrl}/${encodeURIComponent(p.slug)}`, 
       lastModified: new Date(p.createdAt || now.toISOString()),
       changeFrequency: "weekly" as const,
       priority: 0.7,
