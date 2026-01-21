@@ -24,7 +24,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const posts = await fetchAllBlogPosts(siteUrl);
 
-  // ✅ Only published
   const publishedPosts = posts.filter(
     (p) => String(p.post_status ?? "").toLowerCase().trim() === "publish"
   );
